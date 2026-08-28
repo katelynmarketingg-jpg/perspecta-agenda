@@ -15,6 +15,7 @@ import {
 } from "./mock";
 import { getSupabase } from "./supabaseClient";
 import { horaParaMin } from "./slots";
+import { hojeBrasilISO } from "./tz";
 
 // ---------------------------------------------------------------------------
 // Camada de acesso a dados.
@@ -34,7 +35,7 @@ export const SEM_PREFERENCIA = "p-any";
 function resolveInicioSeed(inicio: string): string {
   const m = inicio.match(/^SEED_HOJE_T(\d{2}:\d{2})$/);
   if (!m) return inicio;
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeBrasilISO();
   return `${hoje}T${m[1]}:00`;
 }
 

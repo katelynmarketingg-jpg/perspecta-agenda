@@ -371,13 +371,14 @@ function ThemeToggle() {
 }
 
 // Gera os próximos N dias a partir de hoje (domingos desabilitados).
+// Usa componentes locais (não toISOString, que é UTC e poderia pular um dia à noite).
 function gerarDias(n: number) {
   const out: { iso: string; dow: string; dia: number; mes: string; off: boolean }[] = [];
   const hoje = new Date();
   for (let i = 0; i < n; i++) {
     const d = new Date(hoje);
     d.setDate(hoje.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const p = partesData(iso);
     out.push({ iso, dow: p.dow, dia: p.dia, mes: p.mes, off: d.getDay() === 0 });
   }

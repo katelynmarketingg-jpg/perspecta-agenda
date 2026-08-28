@@ -1,4 +1,5 @@
 import type { Slot, Unidade } from "./types";
+import { agoraBrasil } from "./tz";
 
 // Geração da grade de horários — o coração da regra de disponibilidade.
 //
@@ -27,16 +28,15 @@ export function gerarSlots(
   dataISO: string, // "YYYY-MM-DD"
   duracaoMin: number,
   ocupados: Intervalo[], // em minutos desde 00:00, no dia escolhido
-  agora: Date = new Date(),
 ): Slot[] {
   const abre = unidade.abreHora * 60;
   const fecha = unidade.fechaHora * 60;
   const slots: Slot[] = [];
 
-  // Se a data escolhida for hoje, bloquear horários que já passaram.
-  const hojeISO = agora.toISOString().slice(0, 10);
-  const ehHoje = dataISO === hojeISO;
-  const minutoAtual = agora.getHours() * 60 + agora.getMinutes();
+  // Se a data escolhida for hoje (no fuso do Brasil), bloquear horários que já passaram.
+  const agora = agoraBrasil();
+  const ehHoje = dataISO === agora.dataISO;
+  const minutoAtual = agora.minutos;
 
   for (let t = abre; t + duracaoMin <= fecha; t += PASSO_MIN) {
     const slot: Intervalo = { inicioMin: t, fimMin: t + duracaoMin };
