@@ -43,9 +43,24 @@ export default function BookingWizard({ slug, branding, unidades, profissionais,
   const [dia, setDia] = useState("");
   const [hora, setHora] = useState("");
 
+  // Identificação do cliente — pedida só no fim (etapa Resumo).
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState(""); // apenas dígitos
+
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+
+  // Pré-preenche com o último cliente deste dispositivo (conveniência).
+  useEffect(() => {
+    try {
+      setNome(localStorage.getItem("cliente_nome") || "");
+      setTelefone(localStorage.getItem("cliente_tel") || "");
+    } catch { /* ignore */ }
+  }, []);
+
+  const telValido = telefone.length >= 10;
+  const podeConfirmar = nome.trim().length >= 2 && telValido;
 
   // Seleções resolvidas em objetos --------------------------------------
   const unidade = unidades.find((u) => u.id === localId) || null;
@@ -100,7 +115,7 @@ export default function BookingWizard({ slug, branding, unidades, profissionais,
   function voltar() {
     if (phase === "ok") { setPhase("flow"); setStep("resumo"); return; }
     if (idx > 0) setStep(FLOW[idx - 1]);
-    else router.push("/login");
+    else router.push("/");
   }
 
   function toggleServ(id: string) {
@@ -112,12 +127,15 @@ export default function BookingWizard({ slug, branding, unidades, profissionais,
   }
 
   async function confirmar() {
+    if (!podeConfirmar) return;
     setEnviando(true);
     setErro("");
-    let clienteId = "cliente-demo", clienteNome = "Cliente";
+    // O telefone (só dígitos) é a identidade do cliente; o nome é exibição.
+    const clienteId = telefone;
+    const clienteNome = nome.trim();
     try {
-      clienteId = localStorage.getItem("cliente_id") || clienteId;
-      clienteNome = localStorage.getItem("cliente_nome") || clienteNome;
+      localStorage.setItem("cliente_nome", clienteNome);
+      localStorage.setItem("cliente_tel", telefone);
     } catch { /* ignore */ }
 
     try {
@@ -253,6 +271,10 @@ export default function BookingWizard({ slug, branding, unidades, profissionais,
             hora={hora}
             preco={preco}
             erro={erro}
+            nome={nome}
+            telefone={telefone}
+            onNome={setNome}
+            onTelefone={(v) => setTelefone(soDigitos(v).slice(0, 11))}
           />
         )}
       </div>
@@ -262,7 +284,7 @@ export default function BookingWizard({ slug, branding, unidades, profissionais,
           {phase === "ok" ? (
             <button className="cta" onClick={() => router.push("/meus")}>Ver meus agendamentos</button>
           ) : step === "resumo" ? (
-            <button className="cta" onClick={confirmar} disabled={enviando}>
+            <button className="cta" onClick={confirmar} disabled={enviando || !podeConfirmar}>
               {enviando ? "Confirmando…" : "Confirmar agendamento"}
             </button>
           ) : (
@@ -313,6 +335,8 @@ function SlotGrid({ slots, horaSel, onPick }: { slots: Slot[] | null; horaSel: s
 function Resumo(props: {
   branding: Branding; localNome: string; profNome: string; servTxt: string;
   duracao: number; dataISO: string; hora: string; preco: number; erro: string;
+  nome: string; telefone: string;
+  onNome: (v: string) => void; onTelefone: (v: string) => void;
 }) {
   return (
     <>
@@ -329,10 +353,36 @@ function Resumo(props: {
         </div>
         <div className="total"><span>Total · pagamento no local</span><b>{reais(props.preco)}</b></div>
       </div>
+
+      {/* Identificação — só aqui no fim, sem login */}
+      <div className="period">Seus dados</div>
+      <div className="field">
+        <label>Nome</label>
+        <input value={props.nome} onChange={(e) => props.onNome(e.target.value)} placeholder="Como te chamamos?" autoComplete="name" />
+      </div>
+      <div className="field">
+        <label>Telefone (WhatsApp)</label>
+        <input value={maskTel(props.telefone)} onChange={(e) => props.onTelefone(e.target.value)} placeholder="(51) 99999-9999" inputMode="tel" autoComplete="tel" />
+      </div>
+
       <div className="pill"><span className="dot" /> Você paga na barbearia — nada é cobrado agora</div>
       {props.erro && <div className="pill" style={{ color: "#e08a7a" }}>{props.erro}</div>}
     </>
   );
+}
+
+// Só os dígitos de um texto.
+function soDigitos(v: string): string {
+  return v.replace(/\D/g, "");
+}
+
+// Formata dígitos como telefone BR: (99) 99999-9999 ou (99) 9999-9999.
+function maskTel(digs: string): string {
+  const d = digs.slice(0, 11);
+  if (d.length <= 2) return d ? `(${d}` : "";
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 function Confirmacao({ profNome, dataISO, hora }: { profNome: string; dataISO: string; hora: string }) {

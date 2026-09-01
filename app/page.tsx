@@ -1,6 +1,11 @@
-import { redirect } from "next/navigation";
+import { getBranding } from "@/lib/data";
+import StartScreen from "@/components/StartScreen";
 
-// A raiz leva direto ao login do cliente.
+const TENANT = process.env.NEXT_PUBLIC_TENANT || "navalha";
+
+// Tela inicial (sem login): agendar ou consultar por telefone.
 export default function Home() {
-  redirect("/login");
+  const branding = getBranding(TENANT);
+  if (!branding) return <div className="app"><div className="body">Barbearia não encontrada.</div></div>;
+  return <StartScreen branding={branding} />;
 }

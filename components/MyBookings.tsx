@@ -11,21 +11,46 @@ type Props = {
   unidades: Unidade[];
   profissionais: Profissional[];
   servicos: Servico[];
+  telInicial?: string; // dígitos vindos da query (?tel=)
 };
 
-export default function MyBookings({ slug, branding, unidades, profissionais, servicos }: Props) {
-  const router = useRouter();
-  const [ags, setAgs] = useState<Agendamento[] | null>(null);
+function maskTel(digs: string): string {
+  const d = digs.slice(0, 11);
+  if (d.length <= 2) return d ? `(${d}` : "";
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
-  useEffect(() => {
-    let clienteId = "";
-    try { clienteId = localStorage.getItem("cliente_id") || ""; } catch { /* ignore */ }
-    if (!clienteId) { setAgs([]); return; }
-    fetch(`/api/agendamentos?slug=${slug}&cliente=${encodeURIComponent(clienteId)}`)
+export default function MyBookings({ slug, branding, unidades, profissionais, servicos, telInicial }: Props) {
+  const router = useRouter();
+  const [tel, setTel] = useState(telInicial || "");
+  const [ags, setAgs] = useState<Agendamento[] | null>(null);
+  const [buscou, setBuscou] = useState(false);
+
+  const digitos = tel.replace(/\D/g, "").slice(0, 11);
+
+  function buscar(digs: string) {
+    if (digs.length < 10) return;
+    setAgs(null);
+    setBuscou(true);
+    try { localStorage.setItem("cliente_tel", digs); } catch { /* ignore */ }
+    fetch(`/api/agendamentos?slug=${slug}&tel=${encodeURIComponent(digs)}`)
       .then((r) => r.json())
       .then((d) => setAgs(d.agendamentos ?? []))
       .catch(() => setAgs([]));
-  }, [slug]);
+  }
+
+  // Busca automática se veio telefone pela query, senão tenta o último salvo.
+  useEffect(() => {
+    let inicial = telInicial || "";
+    if (!inicial) {
+      try { inicial = localStorage.getItem("cliente_tel") || ""; } catch { /* ignore */ }
+      if (inicial) setTel(inicial);
+    }
+    if (inicial.length >= 10) buscar(inicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const nomeUnidade = (id: string) => unidades.find((u) => u.id === id)?.nome ?? "";
   const nomeProf = (id: string) => (id === "p-any" ? "Primeiro disponível" : profissionais.find((p) => p.id === id)?.nome ?? "");
@@ -35,7 +60,7 @@ export default function MyBookings({ slug, branding, unidades, profissionais, se
     <div className="app" style={{ ["--brass" as any]: branding.cor, ["--brass-soft" as any]: `color-mix(in srgb, ${branding.cor} 72%, white)` }}>
       <div className="topbar">
         <div className="row">
-          <button className="iconbtn" onClick={() => router.push("/agendar")} aria-label="Voltar">‹</button>
+          <button className="iconbtn" onClick={() => router.push("/")} aria-label="Voltar">‹</button>
           <div className="grow">
             <div className="crumb">{branding.nome}</div>
             <div className="steptitle">Meus agendamentos</div>
@@ -44,11 +69,26 @@ export default function MyBookings({ slug, branding, unidades, profissionais, se
       </div>
 
       <div className="body">
-        {ags === null ? (
+        <div className="field">
+          <label>Seu telefone</label>
+          <input
+            value={maskTel(digitos)}
+            onChange={(e) => setTel(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && buscar(digitos)}
+            placeholder="(51) 99999-9999"
+            inputMode="tel"
+            autoComplete="tel"
+          />
+        </div>
+        <div style={{ height: 10 }} />
+        <button className="cta ghost" onClick={() => buscar(digitos)} disabled={digitos.length < 10}>Buscar</button>
+
+        <div style={{ height: 8 }} />
+        {ags === null && buscou ? (
           <div className="empty">Carregando…</div>
-        ) : ags.length === 0 ? (
-          <div className="empty">Você ainda não tem agendamentos.</div>
-        ) : (
+        ) : ags && buscou && ags.length === 0 ? (
+          <div className="empty">Nenhum agendamento encontrado para este telefone.</div>
+        ) : ags && ags.length > 0 ? (
           ags.map((a) => {
             const p = partesData(a.inicio.slice(0, 10));
             const hora = a.inicio.slice(11, 16);
@@ -67,12 +107,12 @@ export default function MyBookings({ slug, branding, unidades, profissionais, se
               </div>
             );
           })
-        )}
+        ) : null}
       </div>
 
       <div className="foot">
         <div className="stack">
-          <button className="cta ghost" onClick={() => router.push("/agendar")}>Novo agendamento</button>
+          <button className="cta" onClick={() => router.push("/agendar")}>Novo agendamento</button>
         </div>
       </div>
     </div>

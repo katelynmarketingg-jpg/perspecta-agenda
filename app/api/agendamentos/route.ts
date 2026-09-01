@@ -4,10 +4,13 @@ import type { NovoAgendamento } from "@/lib/types";
 
 const TENANT = process.env.NEXT_PUBLIC_TENANT || "navalha";
 
-// GET /api/agendamentos?cliente=<id>  — lista os agendamentos do cliente.
+// GET /api/agendamentos?tel=<telefone>  — lista os agendamentos por telefone.
+// O telefone (só dígitos) é a identidade do cliente. Aceita ?cliente= como alias.
 export async function GET(req: NextRequest) {
-  const clienteId = req.nextUrl.searchParams.get("cliente") ?? "";
-  const slug = req.nextUrl.searchParams.get("slug") ?? TENANT;
+  const q = req.nextUrl.searchParams;
+  const bruto = q.get("tel") ?? q.get("cliente") ?? "";
+  const clienteId = bruto.replace(/\D/g, "");
+  const slug = q.get("slug") ?? TENANT;
   if (!clienteId) return NextResponse.json({ agendamentos: [] });
   return NextResponse.json({ agendamentos: getAgendamentosDoCliente(slug, clienteId) });
 }

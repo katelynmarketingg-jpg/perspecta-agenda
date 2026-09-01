@@ -30,7 +30,7 @@ export default function BrandingPanel({ inicial }: { inicial: Branding }) {
     <div className="app" style={{ ["--brass" as any]: cor, ["--brass-soft" as any]: soft }}>
       <div className="topbar">
         <div className="row">
-          <button className="iconbtn" onClick={() => router.push("/login")} aria-label="Voltar">‹</button>
+          <button className="iconbtn" onClick={() => router.push("/")} aria-label="Voltar">‹</button>
           <div className="grow">
             <div className="crumb">Painel do dono</div>
             <div className="steptitle">Personalizar a marca</div>
