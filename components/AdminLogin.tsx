@@ -35,7 +35,7 @@ export default function AdminLogin({ branding }: { branding: Branding }) {
       <div className="body">
         <div className="login-hero">
           <div className="logo"><span className="stroke">{branding.simbolo}</span> {branding.nome}</div>
-          <div className="tagline">Painel do administrador</div>
+          <div className="tagline">Painel · dono ou barbeiro</div>
         </div>
 
         <div className="field">

@@ -35,6 +35,14 @@ export type Profissional = {
   avaliacoes: number;
   unidades: string[]; // ids de Unidade onde atende
   servicos: string[]; // ids de Serviço que executa; [] = todos
+  pin?: string; // PIN de acesso do próprio barbeiro ao painel
+};
+
+export type MetodoPagamento = "dinheiro" | "cartao" | "pix";
+
+export type Pagamento = {
+  metodo: MetodoPagamento;
+  valor: number;
 };
 
 export type Servico = {
@@ -60,6 +68,8 @@ export type Agendamento = {
   duracaoMin: number;
   preco: number;
   status: StatusAgendamento;
+  pagamentos?: Pagamento[]; // registrado no ato (pode ser dividido)
+  pago?: boolean;
 };
 
 // Um horário na grade que o cliente vê.

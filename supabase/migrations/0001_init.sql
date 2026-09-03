@@ -53,7 +53,8 @@ create table if not exists profissional (
   rating        numeric default 5,
   avaliacoes    int default 0,
   unidades      text[] not null default '{}', -- ids de unidade onde atende
-  servicos      text[] not null default '{}'  -- ids de serviço que executa; {} = todos
+  servicos      text[] not null default '{}', -- ids de serviço que executa; {} = todos
+  pin           text                          -- PIN de acesso do barbeiro ao painel
 );
 
 -- ---------------------------------------------------------------------------
@@ -71,8 +72,15 @@ create table if not exists agendamento (
   duracao_min      int not null,
   preco            numeric not null,
   status           text not null default 'confirmado',
+  pagamentos       jsonb,               -- formas de pagamento no ato (pode ser dividido)
+  pago             boolean default false,
   criado_em        timestamptz not null default now()
 );
+
+-- Colunas adicionadas depois (idempotente, para bancos já criados).
+alter table profissional add column if not exists pin text;
+alter table agendamento  add column if not exists pagamentos jsonb;
+alter table agendamento  add column if not exists pago boolean default false;
 
 -- Evita dois agendamentos no mesmo horário para o mesmo profissional/unidade.
 create unique index if not exists uniq_slot_profissional
@@ -125,8 +133,8 @@ insert into servico (id, slug, nome, descricao, duracao_min, preco) values
   ('s-premium',     'navalha', 'Combo Premium',         'corte, barba & sobrancelha',    60, 95)
 on conflict (id) do nothing;
 
-insert into profissional (id, slug, nome, iniciais, cor, especialidade, rating, avaliacoes, unidades, servicos) values
-  ('p-rafael', 'navalha', 'Rafael Moura',  'RM', 'linear-gradient(135deg,#d8ac66,#a5702c)', 'Cortes clássicos · navalhado',      4.9, 320, '{u-centro,u-moinhos}', '{}'),
-  ('p-bruno',  'navalha', 'Bruno Tavares', 'BT', 'linear-gradient(135deg,#8fae7f,#4e7a49)', 'Degradê · freestyle',               4.8, 210, '{u-centro,u-canoas}',  '{}'),
-  ('p-diego',  'navalha', 'Diego Antunes', 'DA', 'linear-gradient(135deg,#c98a6a,#9a5238)', 'Barba & terapia · toalha quente',   4.7, 156, '{u-moinhos,u-canoas}', '{s-barba,s-corte-barba,s-premium}')
+insert into profissional (id, slug, nome, iniciais, cor, especialidade, rating, avaliacoes, unidades, servicos, pin) values
+  ('p-rafael', 'navalha', 'Rafael Moura',  'RM', 'linear-gradient(135deg,#d8ac66,#a5702c)', 'Cortes clássicos · navalhado',      4.9, 320, '{u-centro,u-moinhos}', '{}',                              '1111'),
+  ('p-bruno',  'navalha', 'Bruno Tavares', 'BT', 'linear-gradient(135deg,#8fae7f,#4e7a49)', 'Degradê · freestyle',               4.8, 210, '{u-centro,u-canoas}',  '{}',                              '2222'),
+  ('p-diego',  'navalha', 'Diego Antunes', 'DA', 'linear-gradient(135deg,#c98a6a,#9a5238)', 'Barba & terapia · toalha quente',   4.7, 156, '{u-moinhos,u-canoas}', '{s-barba,s-corte-barba,s-premium}', '3333')
 on conflict (id) do nothing;

@@ -2,6 +2,7 @@ import type {
   Agendamento,
   Branding,
   NovoAgendamento,
+  Pagamento,
   Profissional,
   Servico,
   StatusAgendamento,
@@ -29,9 +30,20 @@ import { hojeBrasilISO } from "./tz";
 // (Não persiste entre reinícios do servidor — no Supabase isso vira uma tabela.)
 const criadosMock: Agendamento[] = [];
 
-// Mudanças de status feitas pelo admin no modo mock (id -> status).
-// Permite concluir/cancelar tanto os criados quanto os de seed.
+// Mudanças feitas pelo admin no modo mock (por id). Permite alterar tanto os
+// agendamentos criados quanto os de seed sem um banco.
 const statusOverrides: Record<string, StatusAgendamento> = {};
+const servicoOverrides: Record<string, string[]> = {};
+const pagamentoOverrides: Record<string, Pagamento[]> = {};
+
+// Recalcula duração e preço totais a partir dos serviços escolhidos.
+function recalcServicos(slug: string, servicoIds: string[]) {
+  const servs = servsMock.filter((s) => s.slug === slug && servicoIds.includes(s.id));
+  return {
+    duracaoMin: servs.reduce((a, s) => a + s.duracaoMin, 0),
+    preco: servs.reduce((a, s) => a + s.preco, 0),
+  };
+}
 
 // Sentinela do profissional "sem preferência".
 export const SEM_PREFERENCIA = "p-any";
@@ -80,10 +92,20 @@ function todosAgendamentos(slug: string): Agendamento[] {
   const seed = agendamentosSeed
     .filter((a) => a.slug === slug)
     .map((a) => ({ ...a, inicio: resolveInicioSeed(a.inicio) }));
-  return [...seed, ...criadosMock.filter((a) => a.slug === slug)].map((a) => ({
-    ...a,
-    status: statusOverrides[a.id] ?? a.status,
-  }));
+  return [...seed, ...criadosMock.filter((a) => a.slug === slug)].map((a) => {
+    const servicoIds = servicoOverrides[a.id] ?? a.servicoIds;
+    const recalc = servicoOverrides[a.id] ? recalcServicos(slug, servicoIds) : { duracaoMin: a.duracaoMin, preco: a.preco };
+    const pagamentos = pagamentoOverrides[a.id] ?? a.pagamentos;
+    return {
+      ...a,
+      servicoIds,
+      duracaoMin: recalc.duracaoMin,
+      preco: recalc.preco,
+      status: statusOverrides[a.id] ?? a.status,
+      pagamentos,
+      pago: pagamentos ? true : a.pago,
+    };
+  });
 }
 
 // Só os ativos (confirmados) — usado pela grade de horários e pela consulta
@@ -180,6 +202,44 @@ export async function atualizarStatusAgendamento(
     return;
   }
   statusOverrides[id] = status;
+}
+
+// Troca/acrescenta serviços de um agendamento e recalcula duração e preço.
+export async function atualizarServicosAgendamento(
+  slug: string,
+  id: string,
+  servicoIds: string[],
+): Promise<{ duracaoMin: number; preco: number }> {
+  const recalc = recalcServicos(slug, servicoIds);
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb
+      .from("agendamento")
+      .update({ servico_ids: servicoIds, duracao_min: recalc.duracaoMin, preco: recalc.preco })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    return recalc;
+  }
+  servicoOverrides[id] = servicoIds;
+  return recalc;
+}
+
+// Registra o pagamento feito no ato (uma ou duas formas) e conclui o atendimento.
+export async function registrarPagamento(
+  id: string,
+  pagamentos: Pagamento[],
+): Promise<void> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb
+      .from("agendamento")
+      .update({ pagamentos, pago: true, status: "concluido" })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  pagamentoOverrides[id] = pagamentos;
+  statusOverrides[id] = "concluido";
 }
 
 // Cria um agendamento. No mock, empurra para o store em memória.

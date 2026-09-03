@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE, getAdminPin } from "@/lib/admin";
+import { ADMIN_COOKIE, resolverPin } from "@/lib/admin";
 
-// POST /api/admin/login  body { pin }  — valida o PIN e abre a sessão do admin.
+// POST /api/admin/login  body { pin }  — valida o PIN (dono ou barbeiro) e
+// abre a sessão. O cookie httpOnly guarda o próprio PIN.
 export async function POST(req: NextRequest) {
   let pin = "";
   try {
@@ -10,11 +11,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "JSON inválido" }, { status: 400 });
   }
 
-  if (pin !== getAdminPin()) {
+  const sess = resolverPin(pin);
+  if (!sess) {
     return NextResponse.json({ erro: "PIN incorreto" }, { status: 401 });
   }
 
-  const res = NextResponse.json({ ok: true });
+  const res = NextResponse.json({ ok: true, sessao: sess });
   res.cookies.set(ADMIN_COOKIE, pin, {
     httpOnly: true,
     sameSite: "lax",
