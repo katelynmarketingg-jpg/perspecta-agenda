@@ -4,6 +4,7 @@ import type {
   NovoAgendamento,
   Profissional,
   Servico,
+  StatusAgendamento,
   Unidade,
 } from "./types";
 import {
@@ -27,6 +28,10 @@ import { hojeBrasilISO } from "./tz";
 // Store em memória para agendamentos criados no modo mock.
 // (Não persiste entre reinícios do servidor — no Supabase isso vira uma tabela.)
 const criadosMock: Agendamento[] = [];
+
+// Mudanças de status feitas pelo admin no modo mock (id -> status).
+// Permite concluir/cancelar tanto os criados quanto os de seed.
+const statusOverrides: Record<string, StatusAgendamento> = {};
 
 // Sentinela do profissional "sem preferência".
 export const SEM_PREFERENCIA = "p-any";
@@ -69,14 +74,22 @@ export function getProfissionais(
   });
 }
 
-// Todos os agendamentos ativos do tenant (seed + criados), com datas resolvidas.
-function agendamentosAtivos(slug: string): Agendamento[] {
+// Todos os agendamentos do tenant (seed + criados), com datas resolvidas e
+// os status sobrescritos pelo admin aplicados. Sem filtrar por status.
+function todosAgendamentos(slug: string): Agendamento[] {
   const seed = agendamentosSeed
     .filter((a) => a.slug === slug)
     .map((a) => ({ ...a, inicio: resolveInicioSeed(a.inicio) }));
-  return [...seed, ...criadosMock.filter((a) => a.slug === slug)].filter(
-    (a) => a.status === "confirmado",
-  );
+  return [...seed, ...criadosMock.filter((a) => a.slug === slug)].map((a) => ({
+    ...a,
+    status: statusOverrides[a.id] ?? a.status,
+  }));
+}
+
+// Só os ativos (confirmados) — usado pela grade de horários e pela consulta
+// do cliente. Cancelados/concluídos não ocupam vaga nem aparecem para o cliente.
+function agendamentosAtivos(slug: string): Agendamento[] {
+  return todosAgendamentos(slug).filter((a) => a.status === "confirmado");
 }
 
 // Intervalos ocupados (em minutos desde 00:00) de um profissional, numa unidade,
@@ -110,6 +123,63 @@ export function getAgendamentosDoCliente(
   return agendamentosAtivos(slug)
     .filter((a) => a.clienteId === clienteId)
     .sort((a, b) => a.inicio.localeCompare(b.inicio));
+}
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+export type FiltrosAdmin = {
+  dataISO?: string; // "YYYY-MM-DD"
+  unidadeId?: string;
+  profissionalId?: string;
+  status?: StatusAgendamento;
+};
+
+// Lista TODOS os agendamentos do tenant conforme filtros (visão do admin).
+export async function listarAgendamentos(
+  slug: string,
+  f: FiltrosAdmin = {},
+): Promise<Agendamento[]> {
+  const sb = getSupabase();
+  if (sb) {
+    let q = sb.from("agendamento").select("*").eq("slug", slug);
+    if (f.unidadeId) q = q.eq("unidade_id", f.unidadeId);
+    if (f.profissionalId) q = q.eq("profissional_id", f.profissionalId);
+    if (f.status) q = q.eq("status", f.status);
+    if (f.dataISO) q = q.gte("inicio", `${f.dataISO}T00:00:00`).lte("inicio", `${f.dataISO}T23:59:59`);
+    const { data, error } = await q.order("inicio", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({
+      id: r.id, slug: r.slug, clienteId: r.cliente_id, clienteNome: r.cliente_nome,
+      unidadeId: r.unidade_id, profissionalId: r.profissional_id, servicoIds: r.servico_ids,
+      inicio: r.inicio, duracaoMin: r.duracao_min, preco: r.preco, status: r.status,
+    }));
+  }
+
+  return todosAgendamentos(slug)
+    .filter((a) => {
+      if (f.unidadeId && a.unidadeId !== f.unidadeId) return false;
+      if (f.profissionalId && a.profissionalId !== f.profissionalId) return false;
+      if (f.status && a.status !== f.status) return false;
+      if (f.dataISO && a.inicio.slice(0, 10) !== f.dataISO) return false;
+      return true;
+    })
+    .sort((a, b) => a.inicio.localeCompare(b.inicio));
+}
+
+// Muda o status de um agendamento (concluir, cancelar, reabrir).
+export async function atualizarStatusAgendamento(
+  id: string,
+  status: StatusAgendamento,
+): Promise<void> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("agendamento").update({ status }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  statusOverrides[id] = status;
 }
 
 // Cria um agendamento. No mock, empurra para o store em memória.

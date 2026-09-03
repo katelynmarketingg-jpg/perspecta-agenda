@@ -61,6 +61,8 @@ export default function StartScreen({ branding }: { branding: Branding }) {
         <div className="hint">
           É o dono?{" "}
           <Link href="/config" style={{ color: "var(--brass)" }}>Personalizar a marca</Link>
+          {" · "}
+          <Link href="/admin" style={{ color: "var(--brass)" }}>Painel</Link>
         </div>
       </div>
     </div>
