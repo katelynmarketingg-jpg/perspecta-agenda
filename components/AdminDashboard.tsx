@@ -156,7 +156,7 @@ export default function AdminDashboard({ slug, branding, unidades, profissionais
                 <div className="grow">
                   <h3>{a.clienteNome}</h3>
                   <div className="bs">
-                    {maskTel(a.clienteId)} · {nomesServ(a.servicoIds)}<br />
+                    {maskTel(a.clienteId) && `${maskTel(a.clienteId)} · `}{nomesServ(a.servicoIds)}<br />
                     {nomeProf(a.profissionalId)}
                   </div>
                   <span className={"tag " + a.status}>● {LABEL_STATUS[a.status]}</span>
