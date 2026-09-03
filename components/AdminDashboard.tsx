@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Agendamento, Branding, Profissional, Servico, StatusAgendamento, Unidade } from "@/lib/types";
 import { reais, dataLonga } from "@/lib/format";
 import AgendamentoModal from "./AgendamentoModal";
+import Financeiro from "./Financeiro";
 
 type Modo = "lista" | "agenda" | "cards";
 
@@ -42,6 +43,7 @@ export default function AdminDashboard({ slug, branding, unidades, profissionais
   const [ags, setAgs] = useState<Agendamento[] | null>(null);
   const [modo, setModo] = useState<Modo>("lista");
   const [sel, setSel] = useState<Agendamento | null>(null); // agendamento aberto no modal
+  const [aba, setAba] = useState<"agenda" | "financeiro">("agenda");
 
   useEffect(() => {
     try { const m = localStorage.getItem("admin_modo") as Modo | null; if (m) setModo(m); } catch { /* ignore */ }
@@ -96,6 +98,18 @@ export default function AdminDashboard({ slug, branding, unidades, profissionais
       </div>
 
       <div className="body">
+        {/* Alternador Agenda | Financeiro */}
+        <div className="viewseg" style={{ marginBottom: 10 }}>
+          <button className={aba === "agenda" ? "on" : ""} onClick={() => setAba("agenda")}>Agenda</button>
+          <button className={aba === "financeiro" ? "on" : ""} onClick={() => setAba("financeiro")}>
+            {role === "prof" ? "Meus ganhos" : "Financeiro"}
+          </button>
+        </div>
+
+        {aba === "financeiro" ? (
+          <Financeiro role={role} unidades={unidades} />
+        ) : (
+        <>
         {/* Filtros */}
         <div className="adm-controls">
           <div className="field">
@@ -190,6 +204,8 @@ export default function AdminDashboard({ slug, branding, unidades, profissionais
               </div>
             </div>
           ))
+        )}
+        </>
         )}
       </div>
 

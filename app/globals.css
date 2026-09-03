@@ -311,4 +311,21 @@ a { color: inherit; text-decoration: none; }
   padding: 12px 0 4px; }
 .pay-status b { font-size: 15px; }
 
+/* Financeiro */
+.fin-row { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--line); }
+.fin-row:last-child { border-bottom: none; }
+.fin-row .fl { font-size: 13.5px; font-weight: 600; }
+.fin-row .fsub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.fin-row .fv { font-family: var(--mono); font-size: 14px; font-weight: 700; white-space: nowrap; }
+.fin-row .fv small { display: block; font-size: 10px; color: var(--faint); font-weight: 400; text-align: right; }
+.bar { height: 8px; background: var(--elevated); border-radius: 4px; overflow: hidden; margin-top: 7px; }
+.bar > i { display: block; height: 100%; background: var(--brass); border-radius: 4px; }
+.tile.lucro { grid-column: 1 / -1; text-align: center; padding: 16px; }
+.tile.lucro .tv { font-size: 30px; }
+.tile.neg .tv { color: #e08a7a; }
+.despesa-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.despesa-form .field { margin-top: 0; }
+.despesa-form .full { grid-column: 1 / -1; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

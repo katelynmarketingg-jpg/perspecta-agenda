@@ -1,6 +1,7 @@
 import type {
   Agendamento,
   Branding,
+  Despesa,
   NovoAgendamento,
   Pagamento,
   Profissional,
@@ -240,6 +241,131 @@ export async function registrarPagamento(
   }
   pagamentoOverrides[id] = pagamentos;
   statusOverrides[id] = "concluido";
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro
+// ---------------------------------------------------------------------------
+
+// Despesas em memória (modo mock). No Supabase, vira a tabela `despesa`.
+const despesasMock: Despesa[] = [];
+
+export type PeriodoFinanceiro = { de: string; ate: string; unidadeId?: string; profId?: string };
+
+export type ResumoFinanceiro = {
+  faturamento: number;
+  atendimentos: number;
+  ticketMedio: number;
+  porForma: { dinheiro: number; cartao: number; pix: number; semRegistro: number };
+  comissoesTotal: number;
+  porProfissional: { profId: string; nome: string; atendimentos: number; faturamento: number; comissao: number }[];
+  porServico: { servicoId: string; nome: string; qtd: number; total: number }[];
+};
+
+function noPeriodo(dataISO: string, de: string, ate: string): boolean {
+  return dataISO >= de && dataISO <= ate;
+}
+
+// Agrega os atendimentos CONCLUÍDOS no período (o dinheiro que entrou).
+export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Promise<ResumoFinanceiro> {
+  const concluidos = todosAgendamentos(slug).filter((a) => {
+    if (a.status !== "concluido") return false;
+    if (!noPeriodo(a.inicio.slice(0, 10), p.de, p.ate)) return false;
+    if (p.unidadeId && a.unidadeId !== p.unidadeId) return false;
+    if (p.profId && a.profissionalId !== p.profId) return false;
+    return true;
+  });
+
+  const porForma = { dinheiro: 0, cartao: 0, pix: 0, semRegistro: 0 };
+  let faturamento = 0;
+  const porProfMap: Record<string, { atendimentos: number; faturamento: number; comissaoBase: number }> = {};
+  const porServMap: Record<string, { qtd: number; total: number }> = {};
+
+  for (const a of concluidos) {
+    const valorPago = a.pagamentos?.length ? a.pagamentos.reduce((s, x) => s + x.valor, 0) : a.preco;
+    faturamento += valorPago;
+
+    if (a.pagamentos?.length) {
+      for (const pg of a.pagamentos) porForma[pg.metodo] += pg.valor;
+    } else {
+      porForma.semRegistro += valorPago;
+    }
+
+    const pp = (porProfMap[a.profissionalId] ??= { atendimentos: 0, faturamento: 0, comissaoBase: 0 });
+    pp.atendimentos += 1;
+    pp.faturamento += valorPago;
+    pp.comissaoBase += a.preco;
+
+    for (const sid of a.servicoIds) {
+      const s = servsMock.find((x) => x.slug === slug && x.id === sid);
+      const ps = (porServMap[sid] ??= { qtd: 0, total: 0 });
+      ps.qtd += 1;
+      ps.total += s?.preco ?? 0;
+    }
+  }
+
+  const porProfissional = Object.entries(porProfMap).map(([profId, v]) => {
+    const prof = profsMock.find((x) => x.id === profId);
+    const pct = prof?.comissao ?? 0;
+    return { profId, nome: prof?.nome ?? "—", atendimentos: v.atendimentos, faturamento: v.faturamento, comissao: (v.comissaoBase * pct) / 100 };
+  }).sort((a, b) => b.faturamento - a.faturamento);
+
+  const porServico = Object.entries(porServMap).map(([servicoId, v]) => {
+    const s = servsMock.find((x) => x.id === servicoId);
+    return { servicoId, nome: s?.nome ?? "—", qtd: v.qtd, total: v.total };
+  }).sort((a, b) => b.total - a.total);
+
+  const comissoesTotal = porProfissional.reduce((s, x) => s + x.comissao, 0);
+  const atendimentos = concluidos.length;
+
+  return {
+    faturamento,
+    atendimentos,
+    ticketMedio: atendimentos ? faturamento / atendimentos : 0,
+    porForma,
+    comissoesTotal,
+    porProfissional,
+    porServico,
+  };
+}
+
+export async function listarDespesas(slug: string, p: { de: string; ate: string; unidadeId?: string }): Promise<Despesa[]> {
+  const sb = getSupabase();
+  if (sb) {
+    let q = sb.from("despesa").select("*").eq("slug", slug).gte("data", p.de).lte("data", p.ate);
+    if (p.unidadeId) q = q.eq("unidade_id", p.unidadeId);
+    const { data, error } = await q.order("data", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({ id: r.id, slug: r.slug, unidadeId: r.unidade_id ?? undefined, data: r.data, categoria: r.categoria, descricao: r.descricao, valor: r.valor }));
+  }
+  return despesasMock
+    .filter((d) => d.slug === slug && noPeriodo(d.data, p.de, p.ate) && (!p.unidadeId || d.unidadeId === p.unidadeId))
+    .sort((a, b) => b.data.localeCompare(a.data));
+}
+
+export async function criarDespesa(d: Omit<Despesa, "id">): Promise<Despesa> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("despesa").insert({
+      slug: d.slug, unidade_id: d.unidadeId ?? null, data: d.data, categoria: d.categoria, descricao: d.descricao, valor: d.valor,
+    }).select().single();
+    if (error) throw new Error(error.message);
+    return { ...d, id: data?.id ?? `d-${Date.now()}` };
+  }
+  const registro: Despesa = { ...d, id: `d-${Date.now()}` };
+  despesasMock.push(registro);
+  return registro;
+}
+
+export async function excluirDespesa(id: string): Promise<void> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("despesa").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const i = despesasMock.findIndex((d) => d.id === id);
+  if (i >= 0) despesasMock.splice(i, 1);
 }
 
 // Cria um agendamento. No mock, empurra para o store em memória.

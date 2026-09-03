@@ -29,9 +29,9 @@ export const unidades: Unidade[] = [
 // PINs de exemplo dos barbeiros (MVP). Em produção, cada um define o seu
 // (e no futuro isso vira login por usuário no Supabase Auth).
 export const profissionais: Profissional[] = [
-  { id: "p-rafael", slug: "navalha", nome: "Rafael Moura", iniciais: "RM", cor: "linear-gradient(135deg,#d8ac66,#a5702c)", especialidade: "Cortes clássicos · navalhado", rating: 4.9, avaliacoes: 320, unidades: ["u-centro", "u-moinhos"], servicos: [], pin: "1111" },
-  { id: "p-bruno", slug: "navalha", nome: "Bruno Tavares", iniciais: "BT", cor: "linear-gradient(135deg,#8fae7f,#4e7a49)", especialidade: "Degradê · freestyle", rating: 4.8, avaliacoes: 210, unidades: ["u-centro", "u-canoas"], servicos: [], pin: "2222" },
-  { id: "p-diego", slug: "navalha", nome: "Diego Antunes", iniciais: "DA", cor: "linear-gradient(135deg,#c98a6a,#9a5238)", especialidade: "Barba & terapia · toalha quente", rating: 4.7, avaliacoes: 156, unidades: ["u-moinhos", "u-canoas"], servicos: ["s-barba", "s-corte-barba", "s-premium"], pin: "3333" },
+  { id: "p-rafael", slug: "navalha", nome: "Rafael Moura", iniciais: "RM", cor: "linear-gradient(135deg,#d8ac66,#a5702c)", especialidade: "Cortes clássicos · navalhado", rating: 4.9, avaliacoes: 320, unidades: ["u-centro", "u-moinhos"], servicos: [], pin: "1111", comissao: 50 },
+  { id: "p-bruno", slug: "navalha", nome: "Bruno Tavares", iniciais: "BT", cor: "linear-gradient(135deg,#8fae7f,#4e7a49)", especialidade: "Degradê · freestyle", rating: 4.8, avaliacoes: 210, unidades: ["u-centro", "u-canoas"], servicos: [], pin: "2222", comissao: 45 },
+  { id: "p-diego", slug: "navalha", nome: "Diego Antunes", iniciais: "DA", cor: "linear-gradient(135deg,#c98a6a,#9a5238)", especialidade: "Barba & terapia · toalha quente", rating: 4.7, avaliacoes: 156, unidades: ["u-moinhos", "u-canoas"], servicos: ["s-barba", "s-corte-barba", "s-premium"], pin: "3333", comissao: 40 },
 ];
 
 export const servicos: Servico[] = [

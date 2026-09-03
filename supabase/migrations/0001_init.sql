@@ -54,7 +54,8 @@ create table if not exists profissional (
   avaliacoes    int default 0,
   unidades      text[] not null default '{}', -- ids de unidade onde atende
   servicos      text[] not null default '{}', -- ids de serviço que executa; {} = todos
-  pin           text                          -- PIN de acesso do barbeiro ao painel
+  pin           text,                         -- PIN de acesso do barbeiro ao painel
+  comissao      numeric default 0             -- % de comissão sobre os serviços
 );
 
 -- ---------------------------------------------------------------------------
@@ -79,8 +80,27 @@ create table if not exists agendamento (
 
 -- Colunas adicionadas depois (idempotente, para bancos já criados).
 alter table profissional add column if not exists pin text;
+alter table profissional add column if not exists comissao numeric default 0;
 alter table agendamento  add column if not exists pagamentos jsonb;
 alter table agendamento  add column if not exists pago boolean default false;
+
+-- ---------------------------------------------------------------------------
+-- Despesas (controle financeiro)
+-- ---------------------------------------------------------------------------
+create table if not exists despesa (
+  id         uuid primary key default gen_random_uuid(),
+  slug       text not null references barbearia(slug) on delete cascade,
+  unidade_id text references unidade(id),
+  data       date not null,
+  categoria  text not null default 'outro',
+  descricao  text not null,
+  valor      numeric not null,
+  criado_em  timestamptz not null default now()
+);
+create index if not exists idx_despesa_periodo on despesa (slug, data);
+alter table despesa enable row level security;
+-- Ajustar ao Supabase Auth depois; por ora, gestão via app (server).
+create policy "despesa gestao" on despesa for all using (true) with check (true);
 
 -- Evita dois agendamentos no mesmo horário para o mesmo profissional/unidade.
 create unique index if not exists uniq_slot_profissional
@@ -133,8 +153,8 @@ insert into servico (id, slug, nome, descricao, duracao_min, preco) values
   ('s-premium',     'navalha', 'Combo Premium',         'corte, barba & sobrancelha',    60, 95)
 on conflict (id) do nothing;
 
-insert into profissional (id, slug, nome, iniciais, cor, especialidade, rating, avaliacoes, unidades, servicos, pin) values
-  ('p-rafael', 'navalha', 'Rafael Moura',  'RM', 'linear-gradient(135deg,#d8ac66,#a5702c)', 'Cortes clássicos · navalhado',      4.9, 320, '{u-centro,u-moinhos}', '{}',                              '1111'),
-  ('p-bruno',  'navalha', 'Bruno Tavares', 'BT', 'linear-gradient(135deg,#8fae7f,#4e7a49)', 'Degradê · freestyle',               4.8, 210, '{u-centro,u-canoas}',  '{}',                              '2222'),
-  ('p-diego',  'navalha', 'Diego Antunes', 'DA', 'linear-gradient(135deg,#c98a6a,#9a5238)', 'Barba & terapia · toalha quente',   4.7, 156, '{u-moinhos,u-canoas}', '{s-barba,s-corte-barba,s-premium}', '3333')
+insert into profissional (id, slug, nome, iniciais, cor, especialidade, rating, avaliacoes, unidades, servicos, pin, comissao) values
+  ('p-rafael', 'navalha', 'Rafael Moura',  'RM', 'linear-gradient(135deg,#d8ac66,#a5702c)', 'Cortes clássicos · navalhado',      4.9, 320, '{u-centro,u-moinhos}', '{}',                              '1111', 50),
+  ('p-bruno',  'navalha', 'Bruno Tavares', 'BT', 'linear-gradient(135deg,#8fae7f,#4e7a49)', 'Degradê · freestyle',               4.8, 210, '{u-centro,u-canoas}',  '{}',                              '2222', 45),
+  ('p-diego',  'navalha', 'Diego Antunes', 'DA', 'linear-gradient(135deg,#c98a6a,#9a5238)', 'Barba & terapia · toalha quente',   4.7, 156, '{u-moinhos,u-canoas}', '{s-barba,s-corte-barba,s-premium}', '3333', 40)
 on conflict (id) do nothing;

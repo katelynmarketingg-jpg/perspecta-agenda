@@ -36,6 +36,19 @@ export type Profissional = {
   unidades: string[]; // ids de Unidade onde atende
   servicos: string[]; // ids de Serviço que executa; [] = todos
   pin?: string; // PIN de acesso do próprio barbeiro ao painel
+  comissao?: number; // percentual de comissão sobre os serviços (ex.: 40 = 40%)
+};
+
+export type CategoriaDespesa = "aluguel" | "produtos" | "salario" | "marketing" | "outro";
+
+export type Despesa = {
+  id: string;
+  slug: string;
+  unidadeId?: string;
+  data: string; // "YYYY-MM-DD"
+  categoria: CategoriaDespesa;
+  descricao: string;
+  valor: number;
 };
 
 export type MetodoPagamento = "dinheiro" | "cartao" | "pix";
