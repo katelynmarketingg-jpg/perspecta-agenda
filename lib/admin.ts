@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { profissionais as profsMock } from "./mock";
+import { findProfissionalPorPin } from "./data";
 
 // Acesso ao painel — MVP por PIN. O dono usa ADMIN_PIN e vê todos; cada barbeiro
 // usa o próprio PIN (lib/mock.ts / tabela profissional) e vê só a agenda dele.
@@ -20,7 +20,7 @@ export type Sessao =
 // Resolve um PIN em sessão (dono, barbeiro ou inválido).
 export function resolverPin(pin: string): Sessao {
   if (pin && pin === getAdminPin()) return { role: "dono" };
-  const p = profsMock.find((x) => x.slug === TENANT && x.pin && x.pin === pin);
+  const p = pin ? findProfissionalPorPin(TENANT, pin) : null;
   if (p) return { role: "prof", profId: p.id, profNome: p.nome };
   return null;
 }

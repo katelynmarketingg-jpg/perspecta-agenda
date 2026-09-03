@@ -37,7 +37,10 @@ create table if not exists servico (
   nome        text not null,
   descricao   text,
   duracao_min int not null,
-  preco       numeric not null
+  preco       numeric not null,
+  ativo       boolean default true,
+  combo       boolean default false,
+  itens       text[]                 -- ids dos serviços que compõem o combo
 );
 
 -- ---------------------------------------------------------------------------
@@ -83,6 +86,15 @@ alter table profissional add column if not exists pin text;
 alter table profissional add column if not exists comissao numeric default 0;
 alter table agendamento  add column if not exists pagamentos jsonb;
 alter table agendamento  add column if not exists pago boolean default false;
+alter table servico      add column if not exists ativo boolean default true;
+alter table servico      add column if not exists combo boolean default false;
+alter table servico      add column if not exists itens text[];
+
+-- Escrita no catálogo pelo app (provisório até Supabase Auth): habilita
+-- insert/update/delete além do select público já definido acima.
+create policy "barbearia escrita" on barbearia    for all using (true) with check (true);
+create policy "servico escrita"   on servico      for all using (true) with check (true);
+create policy "prof escrita"      on profissional for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
 -- Despesas (controle financeiro)

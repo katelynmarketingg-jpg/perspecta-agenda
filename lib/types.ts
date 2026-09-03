@@ -65,6 +65,9 @@ export type Servico = {
   descricao?: string;
   duracaoMin: number;
   preco: number; // em reais
+  ativo?: boolean; // false = não aparece no fluxo do cliente (default: ativo)
+  combo?: boolean; // true = combo montado a partir de outros serviços
+  itens?: string[]; // ids dos serviços que compõem o combo
 };
 
 export type StatusAgendamento = "confirmado" | "cancelado" | "concluido";

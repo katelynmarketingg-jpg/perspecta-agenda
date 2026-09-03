@@ -39,7 +39,7 @@ const pagamentoOverrides: Record<string, Pagamento[]> = {};
 
 // Recalcula duração e preço totais a partir dos serviços escolhidos.
 function recalcServicos(slug: string, servicoIds: string[]) {
-  const servs = servsMock.filter((s) => s.slug === slug && servicoIds.includes(s.id));
+  const servs = baseServicos().filter((s) => s.slug === slug && servicoIds.includes(s.id));
   return {
     duracaoMin: servs.reduce((a, s) => a + s.duracaoMin, 0),
     preco: servs.reduce((a, s) => a + s.preco, 0),
@@ -57,16 +57,35 @@ function resolveInicioSeed(inicio: string): string {
   return `${hoje}T${m[1]}:00`;
 }
 
+// Stores mutáveis do catálogo (modo mock). Inicializam a partir do mock na
+// primeira edição; enquanto null, lê-se direto do mock. (No Supabase, o CRUD
+// grava nas tabelas — a persistência definitiva vem ao ligar o banco.)
+let brandingsStore: Branding[] | null = null;
+let servicosStore: Servico[] | null = null;
+let profsStore: Profissional[] | null = null;
+function baseBrandings(): Branding[] { return brandingsStore ?? brandings; }
+function baseServicos(): Servico[] { return servicosStore ?? servsMock; }
+function baseProfs(): Profissional[] { return profsStore ?? profsMock; }
+function mutBrandings(): Branding[] { return (brandingsStore ??= brandings.map((b) => ({ ...b }))); }
+function mutServicos(): Servico[] { return (servicosStore ??= servsMock.map((s) => ({ ...s }))); }
+function mutProfs(): Profissional[] { return (profsStore ??= profsMock.map((p) => ({ ...p }))); }
+
 export function getBranding(slug: string): Branding | null {
-  return brandings.find((b) => b.slug === slug) ?? null;
+  return baseBrandings().find((b) => b.slug === slug) ?? null;
 }
 
 export function getUnidades(slug: string): Unidade[] {
   return unidsMock.filter((u) => u.slug === slug);
 }
 
+// Serviços que aparecem para o cliente (ativos). Combos entram normalmente.
 export function getServicos(slug: string): Servico[] {
-  return servsMock.filter((s) => s.slug === slug);
+  return baseServicos().filter((s) => s.slug === slug && s.ativo !== false);
+}
+
+// Todos os serviços do tenant, inclusive inativos (para o painel de config).
+export function getServicosAdmin(slug: string): Servico[] {
+  return baseServicos().filter((s) => s.slug === slug);
 }
 
 // Profissionais do tenant, opcionalmente filtrados por unidade e serviço.
@@ -75,7 +94,7 @@ export function getProfissionais(
   unidadeId?: string,
   servicoIds?: string[],
 ): Profissional[] {
-  return profsMock.filter((p) => {
+  return baseProfs().filter((p) => {
     if (p.slug !== slug) return false;
     if (unidadeId && !p.unidades.includes(unidadeId)) return false;
     if (servicoIds && servicoIds.length && p.servicos.length) {
@@ -85,6 +104,11 @@ export function getProfissionais(
     }
     return true;
   });
+}
+
+// Usado pelo login por PIN (lib/admin) — considera barbeiros criados na config.
+export function findProfissionalPorPin(slug: string, pin: string): Profissional | null {
+  return baseProfs().find((p) => p.slug === slug && p.pin && p.pin === pin) ?? null;
 }
 
 // Todos os agendamentos do tenant (seed + criados), com datas resolvidas e
@@ -297,7 +321,7 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
     pp.comissaoBase += a.preco;
 
     for (const sid of a.servicoIds) {
-      const s = servsMock.find((x) => x.slug === slug && x.id === sid);
+      const s = baseServicos().find((x) => x.slug === slug && x.id === sid);
       const ps = (porServMap[sid] ??= { qtd: 0, total: 0 });
       ps.qtd += 1;
       ps.total += s?.preco ?? 0;
@@ -305,13 +329,13 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
   }
 
   const porProfissional = Object.entries(porProfMap).map(([profId, v]) => {
-    const prof = profsMock.find((x) => x.id === profId);
+    const prof = baseProfs().find((x) => x.id === profId);
     const pct = prof?.comissao ?? 0;
     return { profId, nome: prof?.nome ?? "—", atendimentos: v.atendimentos, faturamento: v.faturamento, comissao: (v.comissaoBase * pct) / 100 };
   }).sort((a, b) => b.faturamento - a.faturamento);
 
   const porServico = Object.entries(porServMap).map(([servicoId, v]) => {
-    const s = servsMock.find((x) => x.id === servicoId);
+    const s = baseServicos().find((x) => x.id === servicoId);
     return { servicoId, nome: s?.nome ?? "—", qtd: v.qtd, total: v.total };
   }).sort((a, b) => b.total - a.total);
 
@@ -366,6 +390,112 @@ export async function excluirDespesa(id: string): Promise<void> {
   }
   const i = despesasMock.findIndex((d) => d.id === id);
   if (i >= 0) despesasMock.splice(i, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Configurações (catálogo editável pelo dono)
+// ---------------------------------------------------------------------------
+
+// Marca / branding
+export async function atualizarBranding(slug: string, patch: Partial<Branding>): Promise<Branding> {
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from("barbearia").update({
+      nome: patch.nome, simbolo: patch.simbolo, logo_url: patch.logoUrl, cor: patch.cor, tagline: patch.tagline,
+    }).eq("slug", slug);
+    if (error) throw new Error(error.message);
+  }
+  const arr = mutBrandings();
+  const b = arr.find((x) => x.slug === slug);
+  if (b) Object.assign(b, patch);
+  return b ?? (getBranding(slug) as Branding);
+}
+
+// Serviços e combos
+export async function criarServico(slug: string, d: Omit<Servico, "id" | "slug">): Promise<Servico> {
+  const registro: Servico = { id: `s-${Date.now()}`, slug, ativo: true, ...d };
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("servico").insert({
+      slug, nome: d.nome, descricao: d.descricao ?? null, duracao_min: d.duracaoMin, preco: d.preco,
+      ativo: d.ativo ?? true, combo: d.combo ?? false, itens: d.itens ?? null,
+    }).select().single();
+    if (error) throw new Error(error.message);
+    if (data?.id) registro.id = data.id;
+  }
+  mutServicos().push(registro);
+  return registro;
+}
+
+export async function atualizarServico(id: string, patch: Partial<Servico>): Promise<void> {
+  const sb = getSupabase();
+  if (sb) {
+    const up: any = {};
+    if (patch.nome !== undefined) up.nome = patch.nome;
+    if (patch.descricao !== undefined) up.descricao = patch.descricao;
+    if (patch.duracaoMin !== undefined) up.duracao_min = patch.duracaoMin;
+    if (patch.preco !== undefined) up.preco = patch.preco;
+    if (patch.ativo !== undefined) up.ativo = patch.ativo;
+    if (patch.itens !== undefined) up.itens = patch.itens;
+    const { error } = await sb.from("servico").update(up).eq("id", id);
+    if (error) throw new Error(error.message);
+  }
+  const s = mutServicos().find((x) => x.id === id);
+  if (s) Object.assign(s, patch);
+}
+
+export async function excluirServico(id: string): Promise<void> {
+  const sb = getSupabase();
+  if (sb) { const { error } = await sb.from("servico").delete().eq("id", id); if (error) throw new Error(error.message); }
+  const arr = mutServicos();
+  const i = arr.findIndex((x) => x.id === id);
+  if (i >= 0) arr.splice(i, 1);
+}
+
+// Profissionais
+export async function criarProfissional(slug: string, d: Omit<Profissional, "id" | "slug">): Promise<Profissional> {
+  const registro: Profissional = {
+    id: `p-${Date.now()}`, slug,
+    iniciais: d.iniciais || (d.nome || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase(),
+    cor: d.cor || "linear-gradient(135deg,#d8ac66,#a5702c)",
+    rating: d.rating ?? 5, avaliacoes: d.avaliacoes ?? 0,
+    unidades: d.unidades ?? [], servicos: d.servicos ?? [],
+    nome: d.nome, especialidade: d.especialidade ?? "", pin: d.pin, comissao: d.comissao ?? 0,
+  };
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("profissional").insert({
+      slug, nome: registro.nome, iniciais: registro.iniciais, cor: registro.cor, especialidade: registro.especialidade,
+      rating: registro.rating, avaliacoes: registro.avaliacoes, unidades: registro.unidades, servicos: registro.servicos,
+      pin: registro.pin ?? null, comissao: registro.comissao,
+    }).select().single();
+    if (error) throw new Error(error.message);
+    if (data?.id) registro.id = data.id;
+  }
+  mutProfs().push(registro);
+  return registro;
+}
+
+export async function atualizarProfissional(id: string, patch: Partial<Profissional>): Promise<void> {
+  const sb = getSupabase();
+  if (sb) {
+    const up: any = {};
+    for (const [k, col] of [["nome", "nome"], ["especialidade", "especialidade"], ["pin", "pin"], ["comissao", "comissao"], ["unidades", "unidades"], ["servicos", "servicos"], ["cor", "cor"], ["iniciais", "iniciais"]] as const) {
+      if ((patch as any)[k] !== undefined) up[col] = (patch as any)[k];
+    }
+    const { error } = await sb.from("profissional").update(up).eq("id", id);
+    if (error) throw new Error(error.message);
+  }
+  const p = mutProfs().find((x) => x.id === id);
+  if (p) Object.assign(p, patch);
+}
+
+export async function excluirProfissional(id: string): Promise<void> {
+  const sb = getSupabase();
+  if (sb) { const { error } = await sb.from("profissional").delete().eq("id", id); if (error) throw new Error(error.message); }
+  const arr = mutProfs();
+  const i = arr.findIndex((x) => x.id === id);
+  if (i >= 0) arr.splice(i, 1);
 }
 
 // Cria um agendamento. No mock, empurra para o store em memória.
