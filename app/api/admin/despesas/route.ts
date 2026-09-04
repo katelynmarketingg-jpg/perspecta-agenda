@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listarDespesas, criarDespesa, excluirDespesa } from "@/lib/data";
-import { getSessao } from "@/lib/admin";
+import { ehDono } from "@/lib/admin";
 import type { CategoriaDespesa } from "@/lib/types";
 
 const TENANT = process.env.NEXT_PUBLIC_TENANT || "navalha";
 const CATEGORIAS: CategoriaDespesa[] = ["aluguel", "produtos", "salario", "marketing", "outro"];
 
-// Só o dono gerencia despesas.
-function donoOu401() {
-  const s = getSessao();
-  return s && s.role === "dono" ? s : null;
-}
-
 // GET /api/admin/despesas?de=&ate=&unidade=
 export async function GET(req: NextRequest) {
-  if (!donoOu401()) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+  if (!(await ehDono())) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   const q = req.nextUrl.searchParams;
   const de = q.get("de") || "";
   const ate = q.get("ate") || "";
@@ -25,7 +19,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/admin/despesas  body { data, categoria, descricao, valor, unidadeId? }
 export async function POST(req: NextRequest) {
-  if (!donoOu401()) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+  if (!(await ehDono())) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   let b: any;
   try { b = await req.json(); } catch { return NextResponse.json({ erro: "JSON inválido" }, { status: 400 }); }
 
@@ -42,7 +36,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/admin/despesas?id=
 export async function DELETE(req: NextRequest) {
-  if (!donoOu401()) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+  if (!(await ehDono())) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   const id = req.nextUrl.searchParams.get("id") || "";
   if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
   await excluirDespesa(id);

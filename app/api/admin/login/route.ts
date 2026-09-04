@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "JSON inválido" }, { status: 400 });
   }
 
-  const sess = resolverPin(pin);
+  const sess = await resolverPin(pin);
   if (!sess) {
     return NextResponse.json({ erro: "PIN incorreto" }, { status: 401 });
   }

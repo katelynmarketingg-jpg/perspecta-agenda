@@ -7,7 +7,7 @@ const TENANT = process.env.NEXT_PUBLIC_TENANT || "navalha";
 // GET /api/admin/financeiro?de=&ate=&unidade=
 // Dono: visão geral (com despesas e lucro). Barbeiro: só os próprios ganhos.
 export async function GET(req: NextRequest) {
-  const sess = getSessao();
+  const sess = await getSessao();
   if (!sess) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const q = req.nextUrl.searchParams;

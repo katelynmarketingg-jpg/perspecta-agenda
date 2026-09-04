@@ -30,7 +30,7 @@ async function cut(slug: string, de: string, ate: string, profId: string | undef
 // GET /api/admin/relatorios?prof=&de=&ate=
 // Dono: qualquer barbeiro (ou "todos"); barbeiro: forçado ao próprio.
 export async function GET(req: NextRequest) {
-  const sess = getSessao();
+  const sess = await getSessao();
   if (!sess) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const q = req.nextUrl.searchParams;
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     ]);
     const serie = await serieDiaria(TENANT, { de, ate, profId });
 
-    const profs = getProfissionais(TENANT);
+    const profs = await getProfissionais(TENANT);
     const profNome = profId ? (profs.find((p) => p.id === profId)?.nome ?? "") : "";
     const barbeiros = profs.map((p) => ({ id: p.id, nome: p.nome }));
 

@@ -56,9 +56,41 @@ O tenant padrão vem de `NEXT_PUBLIC_TENANT` (default `navalha`).
 
 ## Ligar o Supabase
 
-1. Crie um projeto no Supabase e rode `supabase/migrations/0001_init.sql`.
-2. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-3. Pronto: `lib/data.ts` passa a ler/gravar no banco automaticamente.
+1. Rode `supabase/migrations/0001_init.sql` no SQL Editor. Ele cria o schema
+   `navalha` e as tabelas dentro dele — o `public` e o `commerce` de outros
+   projetos no mesmo Supabase não são tocados.
+2. **Exponha o schema na Data API** (passo que costuma ser esquecido):
+   Integrations → Data API → *Exposed schemas* → adicione `navalha`, mantendo
+   os que já estão → Save. Sem isso a API não enxerga as tabelas.
+3. Preencha as variáveis de ambiente:
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `NEXT_PUBLIC_SUPABASE_SCHEMA=navalha`, `NEXT_PUBLIC_TENANT=navalha`
+   e um `ADMIN_PIN` próprio.
+4. Confira em **`/api/diag`** (veja abaixo).
+
+### Diagnóstico: `/api/diag`
+
+Responde se o app está lendo do banco (`"modo": "live"`) ou dos dados de
+exemplo (`"modo": "mock"`), e, quando alguma tabela falha, devolve o erro exato
+do PostgREST. Existe porque uma configuração incompleta faz o app *parecer*
+funcionar enquanto na verdade não grava nada.
+
+```
+{ "modo": "live", "ok": true, "diagnostico": "Conectado. As 6 tabelas ...",
+  "tabelas": [ { "tabela": "servico", "ok": true, "linhas": 5 }, ... ] }
+```
+
+Erros comuns que ele identifica:
+
+| Sintoma | Causa |
+| --- | --- |
+| `"modo": "mock"` | `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` não definidas |
+| código `PGRST106` | schema `navalha` não está em *Exposed schemas* (passo 2) |
+| `"linhas": 0` em tudo | migração não rodou, ou rodou em outro projeto |
+
+A rota devolve só contagens e mensagens de erro — nunca o conteúdo das linhas
+nem a chave. Ainda assim é **aberta**: proteja ou remova antes de abrir a
+barbearia ao público.
 
 ## Próximos passos
 
