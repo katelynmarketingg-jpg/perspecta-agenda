@@ -32,7 +32,24 @@ function estado(v: string | undefined): Estado {
   return "definida";
 }
 
+// Identidade do deploy. Sem isto nao da para distinguir "a variavel esta
+// vazia" de "voce esta lendo um build antigo, de antes de definir a variavel"
+// — as duas coisas produzem exatamente a mesma resposta.
+function identidadeDoDeploy() {
+  return {
+    deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? null,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+    branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
+    ambiente: process.env.VERCEL_ENV ?? "local",
+    respostaGeradaEm: new Date().toISOString(),
+  };
+}
+
+// Nunca cachear: a resposta so tem valor se refletir o estado deste instante.
+const SEM_CACHE = { "Cache-Control": "no-store, max-age=0, must-revalidate" };
+
 export async function GET() {
+  const deploy = identidadeDoDeploy();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -58,9 +75,10 @@ export async function GET() {
         "e nada é gravado. Veja em `config` quais variáveis estão ausentes ou vazias. " +
         "Atenção: as NEXT_PUBLIC_* são embutidas no bundle durante o BUILD, então " +
         "definir a variável não basta — é preciso um build novo para ela valer.",
+      deploy,
       config,
       tabelas: [],
-    });
+    }, { headers: SEM_CACHE });
   }
 
   // Uma consulta de contagem por tabela (head: true não traz linhas).
@@ -98,5 +116,8 @@ export async function GET() {
       `Veja o campo "erro" de cada uma abaixo.`;
   }
 
-  return NextResponse.json({ modo: "live", ok, diagnostico, config, tabelas }, { status: ok ? 200 : 503 });
+  return NextResponse.json(
+    { modo: "live", ok, diagnostico, deploy, config, tabelas },
+    { status: ok ? 200 : 503, headers: SEM_CACHE },
+  );
 }
