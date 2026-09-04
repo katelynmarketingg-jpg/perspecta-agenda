@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { reais } from "@/lib/format";
 
-type Cut = { atendimentos: number; faturamento: number; comissao: number; ticket: number };
+type Cut = { atendimentos: number; faturamento: number; comissao: number; ticket: number; despesas?: number; lucro?: number };
 type Ponto = { data: string; atendimentos: number; faturamento: number; comissao: number };
 type Resp = {
   role: "dono" | "prof";
   profId: string;
   profNome: string;
+  casa?: boolean;
   cuts: { diario: Cut; semanal: Cut; mensal: Cut };
   periodo: { de: string; ate: string; serie: Ponto[] };
   barbeiros: { id: string; nome: string }[];
@@ -58,6 +59,12 @@ export default function RelatorioBarbeiro({ role, brandNome }: { role: "dono" | 
         <div><div className="mv">{reais(c.faturamento)}</div><div className="ml">{especifico ? "gerou" : "faturou"}</div></div>
         <div><div className="mv">{reais(c.ticket)}</div><div className="ml">ticket</div></div>
       </div>
+      {c.despesas !== undefined && (
+        <div className="rel-lucro">
+          <span>Despesas −{reais(c.despesas)}</span>
+          <b style={{ color: (c.lucro ?? 0) < 0 ? "#e08a7a" : "var(--brass)" }}>Lucro {reais(c.lucro ?? 0)}</b>
+        </div>
+      )}
     </div>
   );
 
@@ -67,7 +74,8 @@ export default function RelatorioBarbeiro({ role, brandNome }: { role: "dono" | 
       ? `No mês você atendeu ${m.atendimentos} clientes, gerou ${reais(m.faturamento)} e sua comissão é ${reais(m.comissao)}.`
       : especifico
         ? `No mês, ${nome} atendeu ${m.atendimentos} clientes, gerou ${reais(m.faturamento)} — comissão de ${reais(m.comissao)}.`
-        : `No mês foram ${m.atendimentos} atendimentos, ${reais(m.faturamento)} de faturamento e ${reais(m.comissao)} em comissões.`;
+        : `No mês foram ${m.atendimentos} atendimentos, ${reais(m.faturamento)} de faturamento e ${reais(m.comissao)} em comissões.` +
+          (m.despesas !== undefined ? ` Despesas ${reais(m.despesas)}, lucro ${reais(m.lucro ?? 0)}.` : "");
 
   const serie = d?.periodo.serie ?? [];
   const maxFat = Math.max(1, ...serie.map((s) => s.faturamento));

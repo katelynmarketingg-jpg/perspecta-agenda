@@ -340,6 +340,9 @@ a { color: inherit; text-decoration: none; }
 .relcard .relmini div { flex: 1; }
 .relcard .relmini .mv { font-family: var(--mono); font-size: 15px; font-weight: 700; }
 .relcard .relmini .ml { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.relcard .rel-lucro { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-strong); font-size: 12.5px; color: var(--muted); }
+.relcard .rel-lucro b { font-family: var(--mono); font-size: 13px; }
 .frase { background: var(--elevated); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px;
   font-size: 15px; line-height: 1.55; margin: 14px 0; }
 .frase b { color: var(--brass); }

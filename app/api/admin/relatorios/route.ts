@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resumoFinanceiro, serieDiaria, getProfissionais } from "@/lib/data";
+import { resumoFinanceiro, serieDiaria, getProfissionais, listarDespesas } from "@/lib/data";
 import { getSessao } from "@/lib/admin";
 import { hojeBrasilISO } from "@/lib/tz";
 
@@ -17,9 +17,14 @@ function ranges() {
   return { hoje, semanaDe: iso(seg), mesDe: hoje.slice(0, 8) + "01" };
 }
 
-async function cut(slug: string, de: string, ate: string, profId?: string) {
+// Quando é a visão consolidada da casa (dono + "Todos"), inclui despesas e lucro.
+async function cut(slug: string, de: string, ate: string, profId: string | undefined, casa: boolean) {
   const r = await resumoFinanceiro(slug, { de, ate, profId });
-  return { atendimentos: r.atendimentos, faturamento: r.faturamento, comissao: r.comissoesTotal, ticket: r.ticketMedio };
+  const base = { atendimentos: r.atendimentos, faturamento: r.faturamento, comissao: r.comissoesTotal, ticket: r.ticketMedio };
+  if (!casa) return base;
+  const desp = await listarDespesas(slug, { de, ate });
+  const despesas = desp.reduce((s, x) => s + x.valor, 0);
+  return { ...base, despesas, lucro: base.faturamento - base.comissao - despesas };
 }
 
 // GET /api/admin/relatorios?prof=&de=&ate=
@@ -41,11 +46,14 @@ export async function GET(req: NextRequest) {
     profId = pParam && pParam !== "todos" ? pParam : undefined;
   }
 
+  // Consolidado da casa (despesas + lucro) só quando dono vê "Todos".
+  const casa = sess.role === "dono" && !profId;
+
   try {
     const [diario, semanal, mensal] = await Promise.all([
-      cut(TENANT, hoje, hoje, profId),
-      cut(TENANT, semanaDe, hoje, profId),
-      cut(TENANT, mesDe, hoje, profId),
+      cut(TENANT, hoje, hoje, profId, casa),
+      cut(TENANT, semanaDe, hoje, profId, casa),
+      cut(TENANT, mesDe, hoje, profId, casa),
     ]);
     const serie = await serieDiaria(TENANT, { de, ate, profId });
 
@@ -57,6 +65,7 @@ export async function GET(req: NextRequest) {
       role: sess.role,
       profId: profId ?? "",
       profNome,
+      casa,
       cuts: { diario, semanal, mensal },
       periodo: { de, ate, serie },
       barbeiros,
