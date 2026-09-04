@@ -23,18 +23,29 @@ const DICA_SCHEMA_NAO_EXPOSTO =
   `No painel do Supabase: Integrations → Data API → Exposed schemas → adicione ` +
   `"${schemaEmUso}" (mantendo os que já estão) → Save.`;
 
+// "ausente" (variável não existe) e "vazia" (existe com valor em branco) pedem
+// correções diferentes no painel da Vercel, então são reportadas separadamente.
+type Estado = "ausente" | "vazia" | "definida";
+function estado(v: string | undefined): Estado {
+  if (v === undefined || v === null) return "ausente";
+  if (v.trim() === "") return "vazia";
+  return "definida";
+}
+
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   const config = {
-    urlDefinida: Boolean(url),
-    url, // pública: já vai no bundle do cliente
-    anonKeyDefinida: Boolean(anon),
+    NEXT_PUBLIC_SUPABASE_URL: estado(url),
+    url: url || null, // pública: já vai no bundle do cliente
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: estado(anon),
     anonKeyPrefixo: anon ? `${anon.slice(0, 12)}…(${anon.length} chars)` : null,
-    schema: schemaEmUso,
-    tenant: process.env.NEXT_PUBLIC_TENANT || "navalha",
-    adminPinDefinido: Boolean(process.env.ADMIN_PIN),
+    NEXT_PUBLIC_SUPABASE_SCHEMA: estado(process.env.NEXT_PUBLIC_SUPABASE_SCHEMA),
+    schemaEmUso,
+    NEXT_PUBLIC_TENANT: estado(process.env.NEXT_PUBLIC_TENANT),
+    tenantEmUso: process.env.NEXT_PUBLIC_TENANT || "navalha",
+    ADMIN_PIN: estado(process.env.ADMIN_PIN),
   };
 
   const sb = getSupabase();
@@ -44,7 +55,9 @@ export async function GET() {
       ok: false,
       diagnostico:
         "Supabase não configurado — o app está usando dados de exemplo (lib/mock.ts) " +
-        "e nada é gravado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+        "e nada é gravado. Veja em `config` quais variáveis estão ausentes ou vazias. " +
+        "Atenção: as NEXT_PUBLIC_* são embutidas no bundle durante o BUILD, então " +
+        "definir a variável não basta — é preciso um build novo para ela valer.",
       config,
       tabelas: [],
     });
