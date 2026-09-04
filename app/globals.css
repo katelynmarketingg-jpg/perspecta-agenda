@@ -328,4 +328,39 @@ a { color: inherit; text-decoration: none; }
 .despesa-form .field { margin-top: 0; }
 .despesa-form .full { grid-column: 1 / -1; }
 
+/* Relatórios */
+.relcards { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 6px 0 4px; }
+@media (min-width: 560px) { .relcards { grid-template-columns: repeat(3, 1fr); } }
+.relcard { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.relcard .relhead { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--brass); }
+.relcard .relhero { margin: 12px 0 4px; }
+.relcard .relhero .rv { font-family: var(--serif); font-weight: 700; font-size: 30px; color: var(--brass); line-height: 1; }
+.relcard .relhero .rl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.relcard .relmini { display: flex; gap: 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.relcard .relmini div { flex: 1; }
+.relcard .relmini .mv { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+.relcard .relmini .ml { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.frase { background: var(--elevated); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px;
+  font-size: 15px; line-height: 1.55; margin: 14px 0; }
+.frase b { color: var(--brass); }
+.serie-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.serie-row .sd { font-family: var(--mono); font-size: 12px; width: 54px; flex: none; color: var(--muted); }
+.serie-row .sbar { flex: 1; }
+.serie-row .sbar .bar { margin: 0; }
+.serie-row .sbar .scap { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px; }
+.serie-row .sbar .scap b { font-family: var(--mono); }
+.print-only { display: none; }
+
+/* Impressão — só o relatório, limpo em papel */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .app { border: none !important; box-shadow: none !important; max-width: 100% !important; margin: 0 !important; }
+  .topbar, .no-print, .foot { display: none !important; }
+  .print-only { display: block; margin-bottom: 12px; }
+  .relcard, .frase, .serie-row { border-color: #ccc !important; background: #fff !important; }
+  .relcard .relhead, .relcard .relhero .rv, .frase b, .serie-row .sbar .scap b { color: #000 !important; }
+  .bar { background: #eee !important; }
+  .bar > i { background: #999 !important; }
+}
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

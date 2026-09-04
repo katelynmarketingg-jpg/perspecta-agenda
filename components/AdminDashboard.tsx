@@ -111,7 +111,7 @@ export default function AdminDashboard({ slug, branding, unidades, profissionais
         </div>
 
         {aba === "financeiro" ? (
-          <Financeiro role={role} unidades={unidades} />
+          <Financeiro role={role} unidades={unidades} brandNome={branding.nome} />
         ) : aba === "config" ? (
           <ConfigPanel branding={branding} unidades={unidades} />
         ) : (

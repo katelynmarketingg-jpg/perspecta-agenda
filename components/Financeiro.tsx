@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CategoriaDespesa, Despesa, Unidade } from "@/lib/types";
 import { reais } from "@/lib/format";
+import RelatorioBarbeiro from "./RelatorioBarbeiro";
 
 type Preset = "hoje" | "semana" | "mes" | "custom";
 type Resumo = {
@@ -21,7 +22,8 @@ const CATS: { v: CategoriaDespesa; l: string }[] = [
 
 function iso(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 
-export default function Financeiro({ role, unidades }: { role: "dono" | "prof"; unidades: Unidade[] }) {
+export default function Financeiro({ role, unidades, brandNome }: { role: "dono" | "prof"; unidades: Unidade[]; brandNome: string }) {
+  const [vista, setVista] = useState<"resumo" | "relatorios">("resumo");
   const [preset, setPreset] = useState<Preset>("hoje");
   const hoje = iso(new Date());
   const [de, setDe] = useState(hoje);
@@ -85,6 +87,16 @@ export default function Financeiro({ role, unidades }: { role: "dono" | "prof"; 
 
   return (
     <>
+      {/* Resumo | Relatórios */}
+      <div className="viewseg" style={{ marginBottom: 8 }}>
+        <button className={vista === "resumo" ? "on" : ""} onClick={() => setVista("resumo")}>Resumo</button>
+        <button className={vista === "relatorios" ? "on" : ""} onClick={() => setVista("relatorios")}>Relatórios</button>
+      </div>
+
+      {vista === "relatorios" ? (
+        <RelatorioBarbeiro role={role} brandNome={brandNome} />
+      ) : (
+      <>
       {/* Período */}
       <div className="viewseg">
         <button className={preset === "hoje" ? "on" : ""} onClick={() => setPreset("hoje")}>Hoje</button>
@@ -203,6 +215,8 @@ export default function Financeiro({ role, unidades }: { role: "dono" | "prof"; 
             </>
           )}
         </>
+      )}
+      </>
       )}
     </>
   );

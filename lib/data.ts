@@ -353,6 +353,28 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
   };
 }
 
+// Série dia a dia (faturamento e comissão por dia) — base dos relatórios.
+export type PontoSerie = { data: string; atendimentos: number; faturamento: number; comissao: number };
+
+export async function serieDiaria(slug: string, p: { de: string; ate: string; profId?: string }): Promise<PontoSerie[]> {
+  const concl = todosAgendamentos(slug).filter((a) =>
+    a.status === "concluido" &&
+    noPeriodo(a.inicio.slice(0, 10), p.de, p.ate) &&
+    (!p.profId || a.profissionalId === p.profId),
+  );
+  const map: Record<string, { atendimentos: number; faturamento: number; comissao: number }> = {};
+  for (const a of concl) {
+    const d = a.inicio.slice(0, 10);
+    const valor = a.pagamentos?.length ? a.pagamentos.reduce((s, x) => s + x.valor, 0) : a.preco;
+    const pct = baseProfs().find((x) => x.id === a.profissionalId)?.comissao ?? 0;
+    const m = (map[d] ??= { atendimentos: 0, faturamento: 0, comissao: 0 });
+    m.atendimentos += 1;
+    m.faturamento += valor;
+    m.comissao += (a.preco * pct) / 100;
+  }
+  return Object.entries(map).map(([data, v]) => ({ data, ...v })).sort((a, b) => a.data.localeCompare(b.data));
+}
+
 export async function listarDespesas(slug: string, p: { de: string; ate: string; unidadeId?: string }): Promise<Despesa[]> {
   const sb = getSupabase();
   if (sb) {
