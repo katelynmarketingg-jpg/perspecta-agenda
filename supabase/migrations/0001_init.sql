@@ -1,6 +1,20 @@
 -- Navalha Agenda — schema inicial (multi-tenant por `slug`).
 -- Rode no SQL Editor do Supabase (ou via CLI). Depois preencha as variáveis
 -- NEXT_PUBLIC_SUPABASE_* para o app deixar o mock e passar a usar o banco.
+--
+-- IMPORTANTE: este app compartilha o mesmo projeto Supabase do Commerce/Juris,
+-- mas em um SCHEMA PRÓPRIO chamado "navalha" (isolado do public e do commerce).
+-- Depois de rodar, exponha o schema em: Project Settings → API → Exposed schemas
+-- (adicione "navalha"). O app já consulta esse schema (lib/supabaseClient.ts).
+
+create schema if not exists navalha;
+-- Cria tudo dentro de "navalha"; "extensions" fica no caminho para gen_random_uuid().
+set search_path to navalha, extensions;
+
+-- Permite o acesso via API (PostgREST) ao schema e seu conteúdo.
+grant usage on schema navalha to anon, authenticated, service_role;
+grant all on all tables in schema navalha to anon, authenticated, service_role;
+alter default privileges in schema navalha grant all on tables to anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- Barbearia (tenant) + branding white-label
