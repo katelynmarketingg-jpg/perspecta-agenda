@@ -32,6 +32,21 @@ function estado(v: string | undefined): Estado {
   return "definida";
 }
 
+// A chave vai em cabecalho HTTP, que so aceita bytes 0-255. Um caractere
+// fora disso derruba a requisicao com "Cannot convert argument to a
+// ByteString", erro que nao diz nada sobre a causa real. O caso comum: colar
+// o valor MASCARADO exibido pelo painel (eyJhbGci••••) em vez da chave.
+function validarChave(k: string): string | null {
+  const fora = [...k].findIndex((c) => c.codePointAt(0)! > 255);
+  if (fora >= 0) {
+    const c = k[fora];
+    return `A chave contem o caractere "${c}" (U+${k.codePointAt(fora)!.toString(16).toUpperCase().padStart(4, "0")}) na posicao ${fora}, que nao e valido em cabecalho HTTP. Quase sempre isso significa que foi colado o valor MASCARADO que o painel exibe, e nao a chave. Copie a chave pelo botao de copiar do Supabase (API Keys -> anon/public) e cole de novo.`;
+  }
+  if (/\s/.test(k)) return "A chave contem espaco ou quebra de linha. Remova.";
+  if (k.split(".").length !== 3) return `A chave nao tem o formato de JWT (esperado 3 partes separadas por ponto, encontrado ${k.split(".").length}).`;
+  return null;
+}
+
 // Identidade do deploy. Sem isto nao da para distinguir "a variavel esta
 // vazia" de "voce esta lendo um build antigo, de antes de definir a variavel"
 // — as duas coisas produzem exatamente a mesma resposta.
@@ -64,6 +79,16 @@ export async function GET() {
     tenantEmUso: process.env.NEXT_PUBLIC_TENANT || "navalha",
     ADMIN_PIN: estado(process.env.ADMIN_PIN),
   };
+
+  // Chave malformada: reportar antes de tentar conectar, senao o erro real
+  // fica escondido atras de um TypeError repetido em todas as tabelas.
+  const problemaChave = anon ? validarChave(anon) : null;
+  if (problemaChave) {
+    return NextResponse.json(
+      { modo: "live", ok: false, diagnostico: problemaChave, deploy, config, tabelas: [] },
+      { status: 503, headers: SEM_CACHE },
+    );
+  }
 
   const sb = getSupabase();
   if (!sb) {
