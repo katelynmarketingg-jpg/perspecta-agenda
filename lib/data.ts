@@ -145,7 +145,7 @@ function agendamentosAtivos(slug: string): Agendamento[] {
 async function carregarAgendamentos(slug: string): Promise<Agendamento[]> {
   const sb = getSupabase();
   if (sb) {
-    const { data, error } = await sb.from("agendamento").select("*").eq("slug", slug);
+    const { data, error } = await sb.from("nav_agendamento").select("*").eq("slug", slug);
     if (error) throw new Error(error.message);
     return (data ?? []).map((r: any) => ({
       id: r.id, slug: r.slug, clienteId: r.cliente_id, clienteNome: r.cliente_nome,
@@ -210,7 +210,7 @@ export async function listarAgendamentos(
 ): Promise<Agendamento[]> {
   const sb = getSupabase();
   if (sb) {
-    let q = sb.from("agendamento").select("*").eq("slug", slug);
+    let q = sb.from("nav_agendamento").select("*").eq("slug", slug);
     if (f.unidadeId) q = q.eq("unidade_id", f.unidadeId);
     if (f.profissionalId) q = q.eq("profissional_id", f.profissionalId);
     if (f.status) q = q.eq("status", f.status);
@@ -242,7 +242,7 @@ export async function atualizarStatusAgendamento(
 ): Promise<void> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("agendamento").update({ status }).eq("id", id);
+    const { error } = await sb.from("nav_agendamento").update({ status }).eq("id", id);
     if (error) throw new Error(error.message);
     return;
   }
@@ -259,7 +259,7 @@ export async function atualizarServicosAgendamento(
   const sb = getSupabase();
   if (sb) {
     const { error } = await sb
-      .from("agendamento")
+      .from("nav_agendamento")
       .update({ servico_ids: servicoIds, duracao_min: recalc.duracaoMin, preco: recalc.preco })
       .eq("id", id);
     if (error) throw new Error(error.message);
@@ -277,7 +277,7 @@ export async function registrarPagamento(
   const sb = getSupabase();
   if (sb) {
     const { error } = await sb
-      .from("agendamento")
+      .from("nav_agendamento")
       .update({ pagamentos, pago: true, status: "concluido" })
       .eq("id", id);
     if (error) throw new Error(error.message);
@@ -398,7 +398,7 @@ export async function serieDiaria(slug: string, p: { de: string; ate: string; pr
 export async function listarDespesas(slug: string, p: { de: string; ate: string; unidadeId?: string }): Promise<Despesa[]> {
   const sb = getSupabase();
   if (sb) {
-    let q = sb.from("despesa").select("*").eq("slug", slug).gte("data", p.de).lte("data", p.ate);
+    let q = sb.from("nav_despesa").select("*").eq("slug", slug).gte("data", p.de).lte("data", p.ate);
     if (p.unidadeId) q = q.eq("unidade_id", p.unidadeId);
     const { data, error } = await q.order("data", { ascending: false });
     if (error) throw new Error(error.message);
@@ -412,7 +412,7 @@ export async function listarDespesas(slug: string, p: { de: string; ate: string;
 export async function criarDespesa(d: Omit<Despesa, "id">): Promise<Despesa> {
   const sb = getSupabase();
   if (sb) {
-    const { data, error } = await sb.from("despesa").insert({
+    const { data, error } = await sb.from("nav_despesa").insert({
       slug: d.slug, unidade_id: d.unidadeId ?? null, data: d.data, categoria: d.categoria, descricao: d.descricao, valor: d.valor,
     }).select().single();
     if (error) throw new Error(error.message);
@@ -426,7 +426,7 @@ export async function criarDespesa(d: Omit<Despesa, "id">): Promise<Despesa> {
 export async function excluirDespesa(id: string): Promise<void> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("despesa").delete().eq("id", id);
+    const { error } = await sb.from("nav_despesa").delete().eq("id", id);
     if (error) throw new Error(error.message);
     return;
   }
@@ -442,7 +442,7 @@ export async function excluirDespesa(id: string): Promise<void> {
 export async function atualizarBranding(slug: string, patch: Partial<Branding>): Promise<Branding> {
   const sb = getSupabase();
   if (sb) {
-    const { error } = await sb.from("barbearia").update({
+    const { error } = await sb.from("nav_barbearia").update({
       nome: patch.nome, simbolo: patch.simbolo, logo_url: patch.logoUrl, cor: patch.cor, tagline: patch.tagline,
     }).eq("slug", slug);
     if (error) throw new Error(error.message);
@@ -458,7 +458,7 @@ export async function criarServico(slug: string, d: Omit<Servico, "id" | "slug">
   const registro: Servico = { id: `s-${Date.now()}`, slug, ativo: true, ...d };
   const sb = getSupabase();
   if (sb) {
-    const { data, error } = await sb.from("servico").insert({
+    const { data, error } = await sb.from("nav_servico").insert({
       slug, nome: d.nome, descricao: d.descricao ?? null, duracao_min: d.duracaoMin, preco: d.preco,
       ativo: d.ativo ?? true, combo: d.combo ?? false, itens: d.itens ?? null,
     }).select().single();
@@ -479,7 +479,7 @@ export async function atualizarServico(id: string, patch: Partial<Servico>): Pro
     if (patch.preco !== undefined) up.preco = patch.preco;
     if (patch.ativo !== undefined) up.ativo = patch.ativo;
     if (patch.itens !== undefined) up.itens = patch.itens;
-    const { error } = await sb.from("servico").update(up).eq("id", id);
+    const { error } = await sb.from("nav_servico").update(up).eq("id", id);
     if (error) throw new Error(error.message);
   }
   const s = mutServicos().find((x) => x.id === id);
@@ -488,7 +488,7 @@ export async function atualizarServico(id: string, patch: Partial<Servico>): Pro
 
 export async function excluirServico(id: string): Promise<void> {
   const sb = getSupabase();
-  if (sb) { const { error } = await sb.from("servico").delete().eq("id", id); if (error) throw new Error(error.message); }
+  if (sb) { const { error } = await sb.from("nav_servico").delete().eq("id", id); if (error) throw new Error(error.message); }
   const arr = mutServicos();
   const i = arr.findIndex((x) => x.id === id);
   if (i >= 0) arr.splice(i, 1);
@@ -506,7 +506,7 @@ export async function criarProfissional(slug: string, d: Omit<Profissional, "id"
   };
   const sb = getSupabase();
   if (sb) {
-    const { data, error } = await sb.from("profissional").insert({
+    const { data, error } = await sb.from("nav_profissional").insert({
       slug, nome: registro.nome, iniciais: registro.iniciais, cor: registro.cor, especialidade: registro.especialidade,
       rating: registro.rating, avaliacoes: registro.avaliacoes, unidades: registro.unidades, servicos: registro.servicos,
       pin: registro.pin ?? null, comissao: registro.comissao,
@@ -525,7 +525,7 @@ export async function atualizarProfissional(id: string, patch: Partial<Profissio
     for (const [k, col] of [["nome", "nome"], ["especialidade", "especialidade"], ["pin", "pin"], ["comissao", "comissao"], ["unidades", "unidades"], ["servicos", "servicos"], ["cor", "cor"], ["iniciais", "iniciais"]] as const) {
       if ((patch as any)[k] !== undefined) up[col] = (patch as any)[k];
     }
-    const { error } = await sb.from("profissional").update(up).eq("id", id);
+    const { error } = await sb.from("nav_profissional").update(up).eq("id", id);
     if (error) throw new Error(error.message);
   }
   const p = mutProfs().find((x) => x.id === id);
@@ -534,7 +534,7 @@ export async function atualizarProfissional(id: string, patch: Partial<Profissio
 
 export async function excluirProfissional(id: string): Promise<void> {
   const sb = getSupabase();
-  if (sb) { const { error } = await sb.from("profissional").delete().eq("id", id); if (error) throw new Error(error.message); }
+  if (sb) { const { error } = await sb.from("nav_profissional").delete().eq("id", id); if (error) throw new Error(error.message); }
   const arr = mutProfs();
   const i = arr.findIndex((x) => x.id === id);
   if (i >= 0) arr.splice(i, 1);
@@ -569,7 +569,7 @@ export async function criarAgendamento(
   const sb = getSupabase();
   if (sb) {
     const { data, error } = await sb
-      .from("agendamento")
+      .from("nav_agendamento")
       .insert({
         slug: registro.slug,
         cliente_id: registro.clienteId,

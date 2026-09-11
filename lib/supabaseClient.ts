@@ -5,8 +5,8 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-// Schema próprio dentro do projeto compartilhado (Commerce=commerce, Juris=public).
-const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || "navalha";
+// Tabelas ficam no schema public (já exposto) com prefixo nav_ para não colidir.
+const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || "public";
 
 export const temSupabase = Boolean(url && anon);
 

@@ -20,12 +20,12 @@ export async function GET() {
   if (url && key) {
     // 1) Consulta na tabela do schema navalha (via Accept-Profile)
     try {
-      const r = await fetch(`${url}/rest/v1/agendamento?select=id&limit=1`, {
+      const r = await fetch(`${url}/rest/v1/nav_agendamento?select=id&limit=1`, {
         headers: { apikey: key, Authorization: `Bearer ${key}`, "Accept-Profile": schema },
         cache: "no-store",
       });
-      info.navalha_status = r.status;
-      info.navalha_body = (await r.text()).slice(0, 300);
+      info.query_status = r.status;
+      info.query_body = (await r.text()).slice(0, 300);
     } catch (e: any) { info.navalha_error = String(e); }
 
     // 2) Consulta no schema public (controle — o key funciona?)
