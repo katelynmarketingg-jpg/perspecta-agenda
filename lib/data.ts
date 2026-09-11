@@ -139,18 +139,37 @@ function agendamentosAtivos(slug: string): Agendamento[] {
   return todosAgendamentos(slug).filter((a) => a.status === "confirmado");
 }
 
+// Carrega os agendamentos do tenant do BANCO quando o Supabase está ligado;
+// caso contrário, do mock (com os overrides em memória). Fonte única de verdade
+// para grade de horários, "meus agendamentos", financeiro e relatórios.
+async function carregarAgendamentos(slug: string): Promise<Agendamento[]> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("agendamento").select("*").eq("slug", slug);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({
+      id: r.id, slug: r.slug, clienteId: r.cliente_id, clienteNome: r.cliente_nome,
+      unidadeId: r.unidade_id, profissionalId: r.profissional_id, servicoIds: r.servico_ids ?? [],
+      inicio: r.inicio, duracaoMin: r.duracao_min, preco: Number(r.preco), status: r.status,
+      pagamentos: r.pagamentos ?? undefined, pago: r.pago ?? false,
+    }));
+  }
+  return todosAgendamentos(slug);
+}
+
 // Intervalos ocupados (em minutos desde 00:00) de um profissional, numa unidade,
 // num dia. Usado por gerarSlots() para desabilitar horários.
-export function getOcupados(
+export async function getOcupados(
   slug: string,
   unidadeId: string,
   profissionalId: string,
   dataISO: string,
-): { inicioMin: number; fimMin: number }[] {
+): Promise<{ inicioMin: number; fimMin: number }[]> {
   // "Sem preferência": assumimos que sempre há algum barbeiro livre.
   if (profissionalId === SEM_PREFERENCIA) return [];
 
-  return agendamentosAtivos(slug)
+  const ativos = (await carregarAgendamentos(slug)).filter((a) => a.status === "confirmado");
+  return ativos
     .filter(
       (a) =>
         a.unidadeId === unidadeId &&
@@ -163,11 +182,12 @@ export function getOcupados(
     });
 }
 
-export function getAgendamentosDoCliente(
+export async function getAgendamentosDoCliente(
   slug: string,
   clienteId: string,
-): Agendamento[] {
-  return agendamentosAtivos(slug)
+): Promise<Agendamento[]> {
+  const ativos = (await carregarAgendamentos(slug)).filter((a) => a.status === "confirmado");
+  return ativos
     .filter((a) => a.clienteId === clienteId)
     .sort((a, b) => a.inicio.localeCompare(b.inicio));
 }
@@ -292,7 +312,7 @@ function noPeriodo(dataISO: string, de: string, ate: string): boolean {
 
 // Agrega os atendimentos CONCLUÍDOS no período (o dinheiro que entrou).
 export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Promise<ResumoFinanceiro> {
-  const concluidos = todosAgendamentos(slug).filter((a) => {
+  const concluidos = (await carregarAgendamentos(slug)).filter((a) => {
     if (a.status !== "concluido") return false;
     if (!noPeriodo(a.inicio.slice(0, 10), p.de, p.ate)) return false;
     if (p.unidadeId && a.unidadeId !== p.unidadeId) return false;
@@ -357,7 +377,7 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
 export type PontoSerie = { data: string; atendimentos: number; faturamento: number; comissao: number };
 
 export async function serieDiaria(slug: string, p: { de: string; ate: string; profId?: string }): Promise<PontoSerie[]> {
-  const concl = todosAgendamentos(slug).filter((a) =>
+  const concl = (await carregarAgendamentos(slug)).filter((a) =>
     a.status === "concluido" &&
     noPeriodo(a.inicio.slice(0, 10), p.de, p.ate) &&
     (!p.profId || a.profissionalId === p.profId),

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const clienteId = bruto.replace(/\D/g, "");
   const slug = q.get("slug") ?? TENANT;
   if (!clienteId) return NextResponse.json({ agendamentos: [] });
-  return NextResponse.json({ agendamentos: getAgendamentosDoCliente(slug, clienteId) });
+  return NextResponse.json({ agendamentos: await getAgendamentosDoCliente(slug, clienteId) });
 }
 
 // POST /api/agendamentos  — cria um agendamento a partir do wizard.

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ slots: [] });
   }
 
-  const ocupados = getOcupados(slug, unidadeId, prof, data);
+  const ocupados = await getOcupados(slug, unidadeId, prof, data);
   const slots = gerarSlots(unidade, data, dur, ocupados);
   return NextResponse.json({ slots });
 }
