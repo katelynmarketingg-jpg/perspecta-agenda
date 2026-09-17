@@ -503,7 +503,7 @@ export async function criarServico(slug: string, d: Omit<Servico, "id" | "slug">
   const sb = getSupabase();
   if (sb) {
     const { data, error } = await sb.from("nav_servico").insert({
-      slug, nome: d.nome, descricao: d.descricao ?? null, duracao_min: d.duracaoMin, preco: d.preco,
+      id: registro.id, slug, nome: d.nome, descricao: d.descricao ?? null, duracao_min: d.duracaoMin, preco: d.preco,
       ativo: d.ativo ?? true, combo: d.combo ?? false, itens: d.itens ?? null,
     }).select().single();
     if (error) throw new Error(error.message);
@@ -551,7 +551,7 @@ export async function criarProfissional(slug: string, d: Omit<Profissional, "id"
   const sb = getSupabase();
   if (sb) {
     const { data, error } = await sb.from("nav_profissional").insert({
-      slug, nome: registro.nome, iniciais: registro.iniciais, cor: registro.cor, especialidade: registro.especialidade,
+      id: registro.id, slug, nome: registro.nome, iniciais: registro.iniciais, cor: registro.cor, especialidade: registro.especialidade,
       rating: registro.rating, avaliacoes: registro.avaliacoes, unidades: registro.unidades, servicos: registro.servicos,
       pin: registro.pin ?? null, comissao: registro.comissao,
     }).select().single();
