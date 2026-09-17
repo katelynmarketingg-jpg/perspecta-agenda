@@ -70,32 +70,72 @@ function mutBrandings(): Branding[] { return (brandingsStore ??= brandings.map((
 function mutServicos(): Servico[] { return (servicosStore ??= servsMock.map((s) => ({ ...s }))); }
 function mutProfs(): Profissional[] { return (profsStore ??= profsMock.map((p) => ({ ...p }))); }
 
-export function getBranding(slug: string): Branding | null {
-  return baseBrandings().find((b) => b.slug === slug) ?? null;
+// --- loaders do catálogo (banco quando Supabase ligado, senão mock) ---------
+async function carregarBrandings(slug: string): Promise<Branding[]> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("nav_barbearia").select("*").eq("slug", slug);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({ slug: r.slug, nome: r.nome, simbolo: r.simbolo, logoUrl: r.logo_url ?? null, cor: r.cor, tagline: r.tagline ?? "" }));
+  }
+  return baseBrandings().filter((b) => b.slug === slug);
 }
 
-export function getUnidades(slug: string): Unidade[] {
+async function carregarUnidades(slug: string): Promise<Unidade[]> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("nav_unidade").select("*").eq("slug", slug);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({ id: r.id, slug: r.slug, nome: r.nome, endereco: r.endereco, distanciaKm: Number(r.distancia_km ?? 0), abreHora: r.abre_hora, fechaHora: r.fecha_hora }));
+  }
   return unidsMock.filter((u) => u.slug === slug);
 }
 
-// Serviços que aparecem para o cliente (ativos). Combos entram normalmente.
-export function getServicos(slug: string): Servico[] {
-  return baseServicos().filter((s) => s.slug === slug && s.ativo !== false);
-}
-
-// Todos os serviços do tenant, inclusive inativos (para o painel de config).
-export function getServicosAdmin(slug: string): Servico[] {
+async function carregarServicos(slug: string): Promise<Servico[]> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("nav_servico").select("*").eq("slug", slug);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({ id: r.id, slug: r.slug, nome: r.nome, descricao: r.descricao ?? undefined, duracaoMin: r.duracao_min, preco: Number(r.preco), ativo: r.ativo, combo: r.combo, itens: r.itens ?? undefined }));
+  }
   return baseServicos().filter((s) => s.slug === slug);
 }
 
+async function carregarProfissionais(slug: string): Promise<Profissional[]> {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from("nav_profissional").select("*").eq("slug", slug);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r: any) => ({ id: r.id, slug: r.slug, nome: r.nome, iniciais: r.iniciais, cor: r.cor, especialidade: r.especialidade, rating: Number(r.rating ?? 5), avaliacoes: r.avaliacoes ?? 0, unidades: r.unidades ?? [], servicos: r.servicos ?? [], pin: r.pin ?? undefined, comissao: Number(r.comissao ?? 0) }));
+  }
+  return baseProfs().filter((p) => p.slug === slug);
+}
+
+export async function getBranding(slug: string): Promise<Branding | null> {
+  return (await carregarBrandings(slug))[0] ?? null;
+}
+
+export async function getUnidades(slug: string): Promise<Unidade[]> {
+  return carregarUnidades(slug);
+}
+
+// Serviços que aparecem para o cliente (ativos). Combos entram normalmente.
+export async function getServicos(slug: string): Promise<Servico[]> {
+  return (await carregarServicos(slug)).filter((s) => s.ativo !== false);
+}
+
+// Todos os serviços do tenant, inclusive inativos (para o painel de config).
+export async function getServicosAdmin(slug: string): Promise<Servico[]> {
+  return carregarServicos(slug);
+}
+
 // Profissionais do tenant, opcionalmente filtrados por unidade e serviço.
-export function getProfissionais(
+export async function getProfissionais(
   slug: string,
   unidadeId?: string,
   servicoIds?: string[],
-): Profissional[] {
-  return baseProfs().filter((p) => {
-    if (p.slug !== slug) return false;
+): Promise<Profissional[]> {
+  return (await carregarProfissionais(slug)).filter((p) => {
     if (unidadeId && !p.unidades.includes(unidadeId)) return false;
     if (servicoIds && servicoIds.length && p.servicos.length) {
       // p.servicos === [] significa "faz todos"; senão precisa cobrir os pedidos.
@@ -107,8 +147,8 @@ export function getProfissionais(
 }
 
 // Usado pelo login por PIN (lib/admin) — considera barbeiros criados na config.
-export function findProfissionalPorPin(slug: string, pin: string): Profissional | null {
-  return baseProfs().find((p) => p.slug === slug && p.pin && p.pin === pin) ?? null;
+export async function findProfissionalPorPin(slug: string, pin: string): Promise<Profissional | null> {
+  return (await carregarProfissionais(slug)).find((p) => p.pin && p.pin === pin) ?? null;
 }
 
 // Todos os agendamentos do tenant (seed + criados), com datas resolvidas e
@@ -255,7 +295,8 @@ export async function atualizarServicosAgendamento(
   id: string,
   servicoIds: string[],
 ): Promise<{ duracaoMin: number; preco: number }> {
-  const recalc = recalcServicos(slug, servicoIds);
+  const servs = (await carregarServicos(slug)).filter((s) => servicoIds.includes(s.id));
+  const recalc = { duracaoMin: servs.reduce((a, s) => a + s.duracaoMin, 0), preco: servs.reduce((a, s) => a + s.preco, 0) };
   const sb = getSupabase();
   if (sb) {
     const { error } = await sb
@@ -320,6 +361,8 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
     return true;
   });
 
+  const [profs, servs] = await Promise.all([carregarProfissionais(slug), carregarServicos(slug)]);
+
   const porForma = { dinheiro: 0, cartao: 0, pix: 0, semRegistro: 0 };
   let faturamento = 0;
   const porProfMap: Record<string, { atendimentos: number; faturamento: number; comissaoBase: number }> = {};
@@ -341,7 +384,7 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
     pp.comissaoBase += a.preco;
 
     for (const sid of a.servicoIds) {
-      const s = baseServicos().find((x) => x.slug === slug && x.id === sid);
+      const s = servs.find((x) => x.id === sid);
       const ps = (porServMap[sid] ??= { qtd: 0, total: 0 });
       ps.qtd += 1;
       ps.total += s?.preco ?? 0;
@@ -349,13 +392,13 @@ export async function resumoFinanceiro(slug: string, p: PeriodoFinanceiro): Prom
   }
 
   const porProfissional = Object.entries(porProfMap).map(([profId, v]) => {
-    const prof = baseProfs().find((x) => x.id === profId);
+    const prof = profs.find((x) => x.id === profId);
     const pct = prof?.comissao ?? 0;
     return { profId, nome: prof?.nome ?? "—", atendimentos: v.atendimentos, faturamento: v.faturamento, comissao: (v.comissaoBase * pct) / 100 };
   }).sort((a, b) => b.faturamento - a.faturamento);
 
   const porServico = Object.entries(porServMap).map(([servicoId, v]) => {
-    const s = baseServicos().find((x) => x.id === servicoId);
+    const s = servs.find((x) => x.id === servicoId);
     return { servicoId, nome: s?.nome ?? "—", qtd: v.qtd, total: v.total };
   }).sort((a, b) => b.total - a.total);
 
@@ -382,11 +425,12 @@ export async function serieDiaria(slug: string, p: { de: string; ate: string; pr
     noPeriodo(a.inicio.slice(0, 10), p.de, p.ate) &&
     (!p.profId || a.profissionalId === p.profId),
   );
+  const profs = await carregarProfissionais(slug);
   const map: Record<string, { atendimentos: number; faturamento: number; comissao: number }> = {};
   for (const a of concl) {
     const d = a.inicio.slice(0, 10);
     const valor = a.pagamentos?.length ? a.pagamentos.reduce((s, x) => s + x.valor, 0) : a.preco;
-    const pct = baseProfs().find((x) => x.id === a.profissionalId)?.comissao ?? 0;
+    const pct = profs.find((x) => x.id === a.profissionalId)?.comissao ?? 0;
     const m = (map[d] ??= { atendimentos: 0, faturamento: 0, comissao: 0 });
     m.atendimentos += 1;
     m.faturamento += valor;
@@ -545,7 +589,7 @@ export async function excluirProfissional(id: string): Promise<void> {
 export async function criarAgendamento(
   novo: NovoAgendamento,
 ): Promise<Agendamento> {
-  const servs = getServicos(novo.slug).filter((s) =>
+  const servs = (await carregarServicos(novo.slug)).filter((s) =>
     novo.servicoIds.includes(s.id),
   );
   const duracaoMin = servs.reduce((acc, s) => acc + s.duracaoMin, 0);

@@ -14,7 +14,7 @@ const METODOS: MetodoPagamento[] = ["dinheiro", "cartao", "pix"];
 // PATCH /api/admin/agendamentos/[id]
 // body pode conter { status } | { servicoIds } | { pagamentos } (um por vez ou juntos).
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const sess = getSessao();
+  const sess = await getSessao();
   if (!sess) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   let body: any;

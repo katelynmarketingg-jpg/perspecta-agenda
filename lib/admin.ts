@@ -18,18 +18,18 @@ export type Sessao =
   | null;
 
 // Resolve um PIN em sessão (dono, barbeiro ou inválido).
-export function resolverPin(pin: string): Sessao {
+export async function resolverPin(pin: string): Promise<Sessao> {
   if (pin && pin === getAdminPin()) return { role: "dono" };
-  const p = pin ? findProfissionalPorPin(TENANT, pin) : null;
+  const p = pin ? await findProfissionalPorPin(TENANT, pin) : null;
   if (p) return { role: "prof", profId: p.id, profNome: p.nome };
   return null;
 }
 
 // Lê o cookie (httpOnly = o próprio PIN) e devolve a sessão atual.
-export function getSessao(): Sessao {
+export async function getSessao(): Promise<Sessao> {
   try {
     const pin = cookies().get(ADMIN_COOKIE)?.value ?? "";
-    return resolverPin(pin);
+    return await resolverPin(pin);
   } catch {
     return null;
   }

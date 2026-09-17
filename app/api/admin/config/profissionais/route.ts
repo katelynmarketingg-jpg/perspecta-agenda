@@ -4,17 +4,17 @@ import { getSessao } from "@/lib/admin";
 
 const TENANT = process.env.NEXT_PUBLIC_TENANT || "navalha";
 
-function dono() { const s = getSessao(); return s && s.role === "dono"; }
+async function dono() { const s = await getSessao(); return s && s.role === "dono"; }
 
 // GET — lista os profissionais do tenant.
 export async function GET() {
-  if (!dono()) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
-  return NextResponse.json({ profissionais: getProfissionais(TENANT) });
+  if (!(await dono())) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+  return NextResponse.json({ profissionais: await getProfissionais(TENANT) });
 }
 
 // POST — cadastra barbeiro. body { nome, especialidade?, unidades?, servicos?, comissao?, pin?, cor?, iniciais? }
 export async function POST(req: NextRequest) {
-  if (!dono()) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+  if (!(await dono())) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   let b: any;
   try { b = await req.json(); } catch { return NextResponse.json({ erro: "JSON inválido" }, { status: 400 }); }
   if (!b?.nome) return NextResponse.json({ erro: "Nome obrigatório" }, { status: 400 });

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const data = q.get("data") ?? "";
   const dur = Number(q.get("dur") ?? "30");
 
-  const unidade = getUnidades(slug).find((u) => u.id === unidadeId);
+  const unidade = (await getUnidades(slug)).find((u) => u.id === unidadeId);
   if (!unidade || !data || !dur) {
     return NextResponse.json({ slots: [] });
   }
